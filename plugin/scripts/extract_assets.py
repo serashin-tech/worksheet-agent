@@ -52,6 +52,9 @@ def baby_numbers(text):
 
 
 def ch_codes(text):
+    # 장소 이름('에디 집', '루피네 집')의 인물 이름은 등장인물이 아니다(EP12 정답 대조 CH주요 120→123/159).
+    # 대사 화자는 빼지 않는다: 빼면 C001처럼 화면 밖 목소리는 맞지만 전체가 121/159로 떨어진다.
+    text = re.sub(r"(에디|뽀로로|루피)\s*(네\s*)?집", " ", text)
     t = re.sub(r"아기\s?뽀로로", "아기", text)
     out = [code for kor, code in MAIN if re.search(kor, t)]
     babies = baby_numbers(text)

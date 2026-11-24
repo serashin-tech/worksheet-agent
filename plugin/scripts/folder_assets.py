@@ -4,6 +4,7 @@
 입력: [{"folder": "series" | "episode", "path": "BG/에디 집 내부.png"}, ...]  (Drive 목록에서 만든 파일 경로)
 가정(확인 필요): 하위 폴더 이름이 BG·CH·PR(또는 배경·캐릭터·소품)이고, 파일 이름이 에셋 이름이다.
 규칙
+- 파일 이름이 '영문코드_한글명'(LoopyIn_CookingTable_루피 집 내부)이면 첫 '_' 뒤가 한글인 자리에서 나눠 코드와 한글명으로 쓴다.
 - 파일 이름(확장자 제외)이 영문이면 그것이 코드다. 한글이면 단어 사전으로 영문 코드로 바꾼다.
 - 한글과 영문이 같은 에셋이면(에디.png, Eddy.png) 한 항목으로 합친다.
 - 한글 이름을 영문 코드로 못 바꾸면 한글 이름을 코드로 쓰고 unresolved에 올린다(PD 확인).
@@ -17,6 +18,7 @@ WORD = {"에디": "Eddy", "뽀로로": "Pororo", "루피": "Loopy", "크롱": "C
         "내부": "In", "외부": "Out", "집": "", "눈길": "SnowRoad", "낮": "SkyDay", "밤": "SkyNight", "아침": "SkyMorning"}
 IMAGE = re.compile(r"\.(png|jpe?g|svg|ai|psd|webp)$", re.I)
 KO_TOKENS = sorted(WORD, key=len, reverse=True)
+PAIR = re.compile(r"^([A-Za-z0-9][A-Za-z0-9_\-]*?)_(?=[^\x00-\x7F])(.+)$")  # 첫 '_' 뒤가 한글이면 앞은 코드, 뒤는 한글명
 
 
 def to_code(stem):
@@ -47,6 +49,9 @@ def from_folders(files):
         if not kind or not IMAGE.search(path):
             skipped.append(path); continue
         stem = IMAGE.sub("", path.split("/")[-1])
+        pair = PAIR.match(stem.strip())  # '영문코드_한글명' 파일은 이름에서 코드와 한글명을 바로 읽는다
+        if pair:
+            assets[kind][pair[2].strip()] = pair[1]; src[(kind, pair[1])] = f["folder"]; continue
         code = to_code(stem)
         if code is None:
             code = stem.strip(); unresolved.append(path)
@@ -65,4 +70,7 @@ if __name__ == "__main__":
     assert a["CH"] == {"에디": "Eddy", "뽀로로": "Pororo"}, a["CH"]       # 한글·영문 같은 이름은 한 항목
     assert a["BG"] == {"에디 집 내부": "EddyIn", "눈길": "SnowRoad"}, a["BG"]  # 영문 EddyIn.png도 같은 코드로 합쳐짐
     assert bad == ["PR/썰매.png", "PR/크리스마스트리.png"] and skip == ["메모.txt"], (bad, skip)
+    a2, bad2, _ = from_folders([{"folder": "series", "path": p} for p in
+                                ["BG/LoopyIn_CookingTable_루피 집 내부.png", "PR/Cbbo_곰인형_파랑.png", "CH/BabyPororo_Christmas_아기 뽀로로 1 - 10.png"]])
+    assert a2 == {"BG": {"루피 집 내부": "LoopyIn_CookingTable"}, "PR": {"곰인형_파랑": "Cbbo"}, "CH": {"아기 뽀로로 1 - 10": "BabyPororo_Christmas"}} and not bad2, a2
     print("ok", a, bad, skip)
