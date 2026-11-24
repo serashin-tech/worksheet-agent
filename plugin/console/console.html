@@ -225,7 +225,9 @@ input[type=file]::file-selector-button { font: inherit; background: var(--surfac
 .arow { display: grid; grid-template-columns: minmax(0, 1fr) 34px; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
 .arow .nm { min-width: 0; } .arow .cnt { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 .chip.rec { background: var(--est); border-color: var(--est-line); }
-.g2 { display: grid; grid-template-columns: 74px 140px minmax(170px, 1fr) minmax(170px, 1fr) minmax(170px, 1fr); gap: 12px; padding: 10px 14px; align-items: start; }
+.cell2 { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; } /* 고른 칩과 '+ 추가'를 옆이 아니라 아래로 쌓는다 */
+.cell2 .chip { margin: 0; }
+.g2 { display: grid; grid-template-columns: 64px 140px repeat(3, minmax(110px, 1fr)); gap: 12px; padding: 10px 14px; align-items: start; }
 .g2.cr { border-bottom: 1px solid var(--line); }
 .g2.lh { position: sticky; top: 0; }
 .addsel { font-size: 12px; padding: 1px 4px; max-width: 120px; }
@@ -603,7 +605,7 @@ function renderG2() {
       h("p", { class: "muted", id: "msg2", style: "font-size:12px;margin:0", role: "status" }),
       h("div", { class: "row" }, h("button", { class: "btn primary", id: "toG3", onclick: () => { commit2(); S.g2 = true; S.built = false; go(3); } }, "에셋 확정하고 워크시트로")))),
     h("p", { class: "muted" }, "BG·CH·PR은 시리즈 에셋 폴더에 있는 것만 고를 수 있습니다. 노란 칩은 시나리오에서 뽑은 추천이며, PD가 확인하고 확정해야 워크시트에 들어갑니다."),
-    h("div", { class: "pane", style: "margin-top:12px" }, h("div", { class: "card", id: "assetBox" }), h("div", {}, h("div", { class: "filters", id: "fl2" }), h("div", { class: "scroll" }, h("div", { class: "list", style: "min-width:900px" },
+    h("div", { class: "pane", style: "margin-top:12px" }, h("div", { class: "card", id: "assetBox" }), h("div", {}, h("div", { class: "filters", id: "fl2" }), h("div", { class: "scroll" }, h("div", { class: "list", style: "min-width:640px" },
       h("div", { class: "g2 lh" }, h("span", {}, "컷"), h("span", {}, "썸네일"), h("span", {}, "BG"), h("span", {}, "CH"), h("span", {}, "PR")), h("div", { id: "rows2" }))))));
   paintAssets(); paintFilters2(); paintRows2(); paintBar2();
 }
@@ -626,18 +628,18 @@ function paintAssets() {
 function paintFilters2() {
   const fl = $("#fl2"); fl.replaceChildren(); if (!S.sa) return;
   const all = Object.values(S.sa);
-  [["all", `전체 ${all.length}샷`], ["empty", `비어 있음 ${emptyShots().length}`], ["nobg", `BG 없음 ${all.filter((v) => !v.bg.length).length}`]]
+  [["all", `전체 ${all.length}샷`], ...["bg", "ch", "pr"].map((k) => ["no" + k, `${k.toUpperCase()} 없음 ${all.filter((v) => !v[k].length).length}`])]
     .forEach(([k, t]) => fl.append(h("button", { "aria-pressed": S.filter2 === k, onclick: () => { S.filter2 = k; paintFilters2(); paintRows2(); } }, t)));
 }
 function paintRows2() {
   const box = $("#rows2"); box.replaceChildren();
   if (!S.sa) { box.append(h("p", { class: "muted", style: "padding:24px 14px" }, "시리즈 에셋 폴더를 읽으면 모든 컷과 샷이 나오고, 샷마다 BG·CH·PR을 고를 수 있습니다.")); return; }
-  const f = S.filter2, rows = shots2().filter((x) => { const v = S.sa[x.key]; return f === "all" || (f === "empty" && !v.bg.length && !v.ch.length && !v.pr.length) || (f === "nobg" && !v.bg.length); });
+  const f = S.filter2, rows = shots2().filter((x) => { const v = S.sa[x.key]; return f === "all" || (f.startsWith("no") && !(v[f.slice(2)] || []).length); });
   if (!rows.length) box.append(h("p", { class: "muted", style: "padding:24px 14px" }, "해당하는 샷이 없습니다."));
   rows.forEach((x) => box.append(row2(x)));
 }
 function chips(x, key, cat) {
-  const v = S.sa[x.key], nm = Object.fromEntries(AL[cat].map((a) => [a.code, a.name])), wrap = h("div", {});
+  const v = S.sa[x.key], nm = Object.fromEntries(AL[cat].map((a) => [a.code, a.name])), wrap = h("div", { class: "cell2" });
   v[key].forEach((code, i) => { const r = v.rec[key].includes(code); wrap.append(h("span", { class: "chip" + (r ? " rec" : ""), title: (nm[code] || code) + (r ? " · 추천" : "") }, code, h("button", { "aria-label": code + " 빼기", onclick: () => { v[key].splice(i, 1); repaint2(x); } }, "×"))); });
   const opts = AL[cat].filter((a) => !v[key].includes(a.code));
   if (opts.length) wrap.append(h("select", { class: "addsel", "aria-label": x.id + " " + cat + " 추가", onchange: (e) => { if (e.target.value) { v[key].push(e.target.value); repaint2(x); } } }, h("option", { value: "" }, "+ 추가"), opts.map((a) => h("option", { value: a.code }, a.name))));
@@ -657,9 +659,9 @@ function repaint2(x) {
 }
 function paintBar2() {
   const c2 = $("#chk2"); if (c2) c2.replaceWith(checks2());
-  setBar(null); const has = !!S.sa, e = emptyShots().length, b = $("#toG3"), cb = $("#c2"), m = $("#msg2");
+  setBar(null); const has = !!S.sa, b = $("#toG3"), cb = $("#c2"), m = $("#msg2");
   if (b) b.disabled = !(has && S.confirmed2); if (cb) cb.disabled = !has;
-  if (m) m.textContent = !has ? "시리즈 에셋 폴더를 읽어야 확정할 수 있습니다." : (e ? `비어 있는 샷 ${e}개는 공란으로 둡니다. 작업자가 채웁니다. ` : "") + "확정하면 Google Sheet를 새로 만듭니다. 기존 시트를 덮어쓰지 않습니다.";
+  if (m) m.textContent = !has ? "시리즈 에셋 폴더를 읽어야 확정할 수 있습니다." : "";
 }
 
 /* ---------- 3. 워크시트 초안 확인: 스토리보드 칸을 보고 분할 칸 수와 TIME(Frame)을 정함 ---------- */
