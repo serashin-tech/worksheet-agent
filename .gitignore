@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+.scratch/
+
+# 토스트 EP12 원본에서 만든 데이터(스크립트로 다시 생성)
+plugin/console/cuts.json
+plugin/console/thumbs.json
+plugin/console/panels.json
+plugin/console/work.json

@@ -1,0 +1,12 @@
+{
+  "name": "worksheet-agent",
+  "description": "토스트 애니메이션 스튜디오의 애니메이션 워크시트 에이전트",
+  "owner": { "name": "Codepresso" },
+  "plugins": [
+    {
+      "name": "worksheet-agent",
+      "source": "./plugin",
+      "description": "원작 대본(docx)과 콘티(PDF)에서 에피소드별 애니메이션 Worksheet(Google Sheet) 초안을 만드는 에이전트"
+    }
+  ]
+}
