@@ -27,11 +27,10 @@ def key(label):
     return "C%03d" % int(label[1:])
 
 
-def main(pdf, out):
-    doc = pymupdf.open(pdf)
+def walk(doc):
+    """그림이 있는 칸마다 (쪽 번호, 칸 번호, 컷 ID, 150dpi 그림 crop)을 PDF 순서대로 낸다."""
     scale = HI_DPI / LDPI
-    groups, order, k = {}, [], 0
-    cur = None
+    k, cur = 0, None
     for pn in range(len(doc)):
         lo = np.frombuffer((p := doc[pn].get_pixmap(dpi=LDPI, colorspace=pymupdf.csGRAY)).samples, np.uint8).reshape(p.h, p.w)
         hi = np.frombuffer((q := doc[pn].get_pixmap(dpi=HI_DPI, colorspace=pymupdf.csGRAY)).samples, np.uint8).reshape(q.h, q.w)
@@ -50,13 +49,19 @@ def main(pdf, out):
             if start:
                 k += 1
                 cur = key(ep12_label(k))
-                groups[cur] = []
-                order.append(cur)
-            if cur is None:
-                continue
-            buf = io.BytesIO()
-            Image.fromarray(crop).resize((W, H)).save(buf, "JPEG", quality=70)
-            groups[cur].append(base64.b64encode(buf.getvalue()).decode())
+            if cur is not None:
+                yield pn, i, cur, crop
+
+
+def main(pdf, out):
+    groups, order = {}, []
+    for _, _, cur, crop in walk(pymupdf.open(pdf)):
+        if cur not in groups:
+            groups[cur] = []
+            order.append(cur)
+        buf = io.BytesIO()
+        Image.fromarray(crop).resize((W, H)).save(buf, "JPEG", quality=70)
+        groups[cur].append(base64.b64encode(buf.getvalue()).decode())
     json.dump({"order": order, "panels": groups}, open(out, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     multi = {c: len(v) for c, v in groups.items() if len(v) > 1}
     print(f"cuts={len(groups)} panels={sum(len(v) for v in groups.values())} multi={len(multi)}")
