@@ -226,7 +226,13 @@ input[type=file]::file-selector-button { font: inherit; background: var(--surfac
 @media (max-width: 860px) { .pane { grid-template-columns: minmax(0, 1fr); } }
 .agrp h3 { margin: 14px 0 6px; font-size: 13px; color: var(--muted); }
 .arow { display: grid; grid-template-columns: minmax(0, 1fr) 34px; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
-.arow .nm { min-width: 0; } .arow .cnt { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.arow .nm { min-width: 0; }
+.arow.ast { grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 8px 0; }
+.arow .acode { margin-left: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
+.arow .ax { border: 0; background: none; color: var(--muted); cursor: pointer; margin-left: 4px; min-width: 24px; min-height: 24px; border-radius: 4px; }
+.arow .ax:focus-visible { outline: 2px solid var(--accent); }
+.arow.ast input[type="text"], .aadd input[type="text"], .aadd select { width: 100%; min-height: 32px; font-size: 13px; padding: 4px 8px; }
+.aadd { display: grid; gap: 6px; } .arow .cnt { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 .chip.rec { background: var(--est); border-color: var(--est-line); }
 /* 워크시트 단계: 블럭 사이 간격, 도구 막대, 목록 카드, 표(CUT 열 고정·CUT 경계 실선·SHOT 경계 점선) */
 .ws { display: flex; flex-direction: column; gap: 16px; }
@@ -240,12 +246,17 @@ input[type=file]::file-selector-button { font: inherit; background: var(--surfac
 .ws .scroll { overscroll-behavior-x: contain; }
 #rows3 .cr.w3:has(+ .sub) { border-bottom-style: dashed; }
 #rows3 > div:last-child > .cr.w3:last-child { border-bottom: 0; }
-.lh.w3 > :first-child, .cr.w3 > :first-child { position: sticky; left: 0; z-index: 1; margin: -10px 0 -10px -14px; padding: 10px 0 10px 14px; box-shadow: 1px 0 0 var(--line); }
-.lh.w3 > :first-child { background: var(--surface-2); }
-.cr.w3 > :first-child { background: var(--surface); align-self: stretch; }
-.cr.w3.need > :first-child { background: var(--warn-soft); }
-@media (hover: hover) { #rows3 .cr.w3:not(.need):hover, #rows3 .cr.w3:not(.need):hover > :first-child { background: var(--surface-2); } }
-@media (prefers-reduced-motion: no-preference) { #rows3 .cr.w3, #rows3 .cr.w3 > :first-child { transition: background-color 150ms ease-out; } }
+/* CUT(0~120px)과 THUMBNAIL(120~258px) 열을 고정한다. 칸 사이 간격(10px)까지 덮어 가로로 넘길 때 뒤 열이 비치지 않게 한다 */
+.lh.w3 > :nth-child(-n+2), .cr.w3 > :nth-child(-n+2) { position: sticky; z-index: 1; margin-block: -10px; padding-block: 10px; }
+.lh.w3 > :first-child, .cr.w3 > :first-child { left: 0; margin-inline: -14px -10px; padding-inline: 14px 10px; }
+.lh.w3 > :nth-child(2), .cr.w3 > :nth-child(2) { left: 120px; margin-right: -10px; padding-right: 10px; box-shadow: 1px 0 0 var(--line); }
+.lh.w3 > :nth-child(-n+2) { background: var(--surface-2); }
+.cr.w3 > :nth-child(-n+2) { background: var(--surface); align-self: stretch; }
+.cr.w3.need > :nth-child(-n+2) { background: var(--warn-soft); }
+@media (hover: hover) { #rows3 .cr.w3:not(.need):hover, #rows3 .cr.w3:not(.need):hover > :nth-child(-n+2) { background: var(--surface-2); } }
+@media (prefers-reduced-motion: no-preference) { #rows3 .cr.w3, #rows3 .cr.w3 > :nth-child(-n+2) { transition: background-color 150ms ease-out; } }
+/* 넓게 보기: 페이지 폭 제한(1180px)을 풀어 큰 모니터에서 워크시트 열 전체를 한 화면에 본다 */
+body.wide .wrap { max-width: none; padding-inline: 24px; }
 .cr.w3 img.pn { outline: 1px solid oklch(0 0 0 / 0.1); outline-offset: -1px; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cr.w3 img.pn { outline-color: oklch(1 0 0 / 0.1); } }
 :root[data-theme="dark"] .cr.w3 img.pn { outline-color: oklch(1 0 0 / 0.1); }
@@ -292,7 +303,7 @@ a.link { color: var(--accent); font-weight: 700; overflow-wrap: anywhere; }
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/1AYqLq2Fn7e3cWHoiK9-3avHFXdn2UIZuVdQ2iPOo7Nw/edit";
 let T = {}, P = {}, PO = [], PT = {}; // PT: 스토리보드 칸마다 OCR로 읽은 DIALOGUE·NOTE(storyboard_text.py)
 const sbText = (id, i) => (PT[id] && PT[id][i]) || { dia: "", note: "" };
-const S = { tab: 0, title: "", builtTitle: "", W: null, wfilter: "all", uploaded: false, g1: false, g2: false, built: false, files: { docx: null, pdf: null }, folders: {}, filter1: "all", filter3: "all", sort3: { k: null, d: 1 }, sort1: { k: null, d: 1 }, filter2: "all", D: null, src: {}, confirmed1: false };
+const S = { tab: 0, title: "", builtTitle: "", W: null, wfilter: "all", uploaded: false, g1: false, g2: false, built: false, files: { docx: null, pdf: null }, folders: {}, filter1: "all", filter3: "all", sort3: { k: null, d: 1 }, sort1: { k: null, d: 1 }, filter2: "all", D: null, src: {}, confirmed1: false, aattr: {}, extra: [] }; // aattr: 에셋별 리깅·디자인 필요·비고, extra: 폴더에 없어 손으로 더한 에셋
 const $ = (s) => document.querySelector(s);
 function h(tag, attrs, ...kids) {
   const e = document.createElement(tag);
@@ -369,6 +380,7 @@ function go(i) {
 
 /* ---------- 제목(바꿀 수 있음) ---------- */
 const LS = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+let WIDE = !!LS.get("wsWide"); document.body.classList.toggle("wide", WIDE); // 넓게 보기 상태(이 브라우저에 저장)
 const series = () => (S.D.series || "").trim();
 const sp = () => (series() ? series() + "/" : "");
 const defTitle = () => (series() ? series() + " " : "") + (S.D.ep ? "EP" + S.D.ep + " " : "") + "Worksheet";
@@ -393,7 +405,7 @@ function setBar(msg, label, ok, fn) {
    poc/folder_assets.py와 같은 규칙이다. 영문 파일 이름은 그대로 코드, 한글은 단어 사전으로 영문 코드로 바꾸고,
    한글·영문이 같은 에셋이면 한 항목으로 합친다. 하위 폴더는 BG·CH·PR(또는 배경·캐릭터·소품)이라고 가정한다.
    폴더에 있는 에셋만 목록과 선택지에 나온다. */
-const A_KIND = { BG: "BG", 배경: "BG", CH: "CH", 캐릭터: "CH", PR: "PR", 소품: "PR", 프롭: "PR" };
+const A_KIND = { BG: "BG", 배경: "BG", CH: "CH", 캐릭터: "CH", PR: "PR", 소품: "PR", 프롭: "PR", Matte: "Matte", 매트: "Matte", "2D": "2D", "2DBG": "2D" };
 const A_WORD = { 에디: "Eddy", 뽀로로: "Pororo", 루피: "Loopy", 크롱: "Crong", 패티: "Petty", 포비: "Poby", 해리: "Harry", 내부: "In", 외부: "Out", 집: "", 눈길: "SnowRoad", 낮: "SkyDay", 밤: "SkyNight", 아침: "SkyMorning" };
 const A_KEYS = Object.keys(A_WORD).sort((a, b) => b.length - a.length), A_IMG = /\.(png|jpe?g|svg|ai|psd|webp)$/i, A_ASCII = /^[A-Za-z0-9_\-]+$/, A_PAIR = /^([A-Za-z0-9][A-Za-z0-9_\-]*?)_(?=[^\u0000-\u007F])(.+)$/;
 function toCode(stem) {
@@ -403,26 +415,29 @@ function toCode(stem) {
 }
 function folderAssets() {
   const files = S.folders.series ? S.folders.series.files : [];
-  const assets = { BG: {}, CH: {}, PR: {} }, unresolved = [], skipped = [];
+  const assets = { BG: {}, CH: {}, PR: {}, Matte: {}, "2D": {} }, where = {}, unresolved = [], skipped = [];
   files.forEach((f) => {
-    const kind = f.path.split("/").slice(0, -1).map((x) => A_KIND[x]).find(Boolean);
+    const kind = f.path.split("/").slice(0, -1).reverse().map((x) => A_KIND[x]).find(Boolean);
     if (!kind || !A_IMG.test(f.path)) { skipped.push(f.path); return; }
     const stem = f.path.split("/").pop().replace(A_IMG, "").trim();
     const pair = stem.match(A_PAIR); // '영문코드_한글명' 파일은 이름에서 코드와 한글명을 바로 읽는다
-    if (pair) { assets[kind][pair[2].trim()] = pair[1]; return; }
+    if (pair) { assets[kind][pair[2].trim()] = pair[1]; where[kind + "/" + pair[1]] = f; return; }
     let code = toCode(stem);
     if (!code) { code = stem; unresolved.push(f.path); }
     const name = A_ASCII.test(stem) ? (Object.keys(assets[kind]).find((n) => assets[kind][n] === code) || stem) : stem;
-    assets[kind][name] = code;
+    assets[kind][name] = code; where[kind + "/" + code] = f;
   });
-  return { assets, unresolved, skipped, n: files.length };
+  return { assets, where, unresolved, skipped, n: files.length };
 }
-const CATS = [["BG", "배경(BG)"], ["CH", "캐릭터(CH)"], ["PR", "소품(PR)"]];
-let AL = { BG: [], CH: [], PR: [] }; // 폴더에서 만든 에셋 목록 {BG:[{name, code}], ...}
-const aList = () => { const a = folderAssets().assets; return Object.fromEntries(CATS.map(([k]) => [k, Object.entries(a[k]).map(([name, code]) => ({ name, code }))])); };
+const CATS = [["BG", "배경(BG)"], ["CH", "캐릭터(CH)"], ["PR", "소품(PR)"], ["Matte", "Matte(하늘 배경)"], ["2D", "2D(이미지 배경)"]];
+let AL = { BG: [], CH: [], PR: [], Matte: [], "2D": [] }; // 폴더에서 만든 에셋 목록 {BG:[{name, code, path}], ...}. 시트 Asset 탭의 원천이다
+const aList = () => { const { assets: a, where } = folderAssets(); return Object.fromEntries(CATS.map(([k]) => [k, [...Object.entries(a[k]).map(([name, code]) => ({ name, code, path: where[k + "/" + code].path, fileId: where[k + "/" + code].id })), ...S.extra.filter((x) => x.cat === k).map(({ name, code }) => ({ name, code, manual: true }))]])); };
+const aKey = (k, code) => k + "/" + code, RIG_T = { "○": "리깅 완료", "△": "리깅 중", "□": "리깅 요청 필요" };
+/* 워크시트 BG 열에는 BG·Matte·2D 코드가 함께 들어간다(EP12: EddyOut, SkyNight) */
+const pool = (cat) => cat === "BG" ? [...AL.BG, ...AL.Matte, ...AL["2D"]] : AL[cat];
 /* 추천: 시나리오에서 뽑은 CUT의 코드 가운데 폴더에 같은 코드나 같은 이름이 있는 것만. 최종값은 PD가 확정한다 */
 function recFor(c, key) {
-  const nm = Object.fromEntries(Object.values(S.D.assets).flat().map((a) => [a.code, a.name])), list = AL[key.toUpperCase()];
+  const nm = Object.fromEntries(Object.values(S.D.assets).flat().map((a) => [a.code, a.name])), list = pool(key.toUpperCase());
   return [...new Set(c[key].map((x) => (list.find((a) => a.code === x || a.name === nm[x]) || {}).code).filter(Boolean))];
 }
 const shots2 = () => groups1().flatMap((g) => P[g.id].map((img, i) => ({ g, i, id: panelName(g, i), key: g.id + "#" + i, img })));
@@ -441,7 +456,7 @@ async function scanFolder(kind, input, btn) {
     const list = async (q) => { let out = [], tok; for (let i = 0; i < 5; i++) { const r = await mcp.callTool("Google Drive", "search_files", { query: q, pageSize: 200, excludeContentSnippets: true, ...(tok ? { pageToken: tok } : {}) }, { cache: false }); const p = r.payload || {}; out = out.concat(p.files || []); tok = p.nextPageToken; if (!tok) break; } return out; };
     const [dirs, files] = await Promise.all([list(`'${id}' in ancestors and mimeType = 'application/vnd.google-apps.folder' and trashed = false`), list(`'${id}' in ancestors and mimeType != 'application/vnd.google-apps.folder' and trashed = false`)]);
     const title = Object.fromEntries(dirs.map((d) => [d.id, d])); const pathOf = (f) => { const parts = [f.title]; let pid = f.parentId; while (pid && title[pid]) { parts.unshift(title[pid].title); pid = title[pid].parentId; } return parts.join("/"); };
-    S.folders[kind] = { files: files.map((f) => ({ folder: kind, path: pathOf(f) })) }; initShots2(); done(`파일 ${files.length}개를 읽었습니다.`);
+    S.folders[kind] = { files: files.map((f) => ({ folder: kind, path: pathOf(f), id: f.id })) }; // id: 플러그인이 렌더 이미지를 내려받을 Drive 파일 initShots2(); done(`파일 ${files.length}개를 읽었습니다.`);
   } catch (e) {
     done(e && e.code === "not_in_manifest" ? "이 페이지에서 Google Drive 사용을 허용하지 않았습니다." : e && e.code === "server_not_connected" ? "Google Drive 커넥터가 연결되어 있지 않습니다." : e && e.code === "needs_reauth" ? "Google Drive 연결이 만료되었습니다. 커넥터에서 다시 연결해 주세요." : "폴더를 읽지 못했습니다" + (e && e.message ? ": " + e.message : "") + ".", true);
   }
@@ -455,10 +470,10 @@ function folderCard() {
   const s = (v, l) => h("div", {}, h("b", {}, v), h("span", {}, l));
   return h("div", { class: "card stack" }, h("h2", {}, "에셋"),
     h("b", {}, "시리즈 에셋 폴더 연결", h("span", { class: "req", "aria-hidden": "true" }, " *")),
-    h("p", { class: "muted", style: "font-size:12px;margin:0" }, "폴더 안에 BG / CH / PR 하위 폴더가 있어야 합니다. 배경은 BG, 캐릭터는 CH, 소품은 PR 폴더에 넣고, 파일 이름이 에셋 이름이 됩니다."),
+    h("p", { class: "muted", style: "font-size:12px;margin:0" }, "폴더 안에 BG / CH / PR 하위 폴더가 있어야 합니다. 배경은 BG, 캐릭터는 CH, 소품은 PR 폴더에 넣고, 파일 이름이 에셋 이름이 됩니다. 하늘 배경은 Matte, 이미지 배경은 2D 폴더에 넣으면 BG 열에서 함께 고를 수 있습니다(BG 폴더 아래에 두어도 됩니다)."),
     h("div", { class: "row", style: "flex-wrap:nowrap" }, inp, btn, badge),
     state === "bad" ? h("div", { class: "note", role: "status" }, m.msg) : null,
-    fa.n ? h("div", { class: "stats", style: "padding:0" }, s(fmt(fa.n), "읽은 파일"), s(fmt(cnt("BG")), "BG"), s(fmt(cnt("CH")), "CH"), s(fmt(cnt("PR")), "PR"), s(fmt(fa.unresolved.length), "영문 코드 필요"), s(fmt(fa.skipped.length), "건너뛴 파일")) : null);
+    fa.n ? h("div", { class: "stats", style: "padding:0" }, s(fmt(fa.n), "읽은 파일"), s(fmt(cnt("BG")), "BG"), s(fmt(cnt("CH")), "CH"), s(fmt(cnt("PR")), "PR"), s(fmt(cnt("Matte") + cnt("2D")), "Matte·2D"), s(fmt(fa.unresolved.length), "영문 코드 필요"), s(fmt(fa.skipped.length), "건너뛴 파일")) : null);
 }
 /* 에셋 단계 오른쪽 카드: 폴더·추천·확정 상태. 칩을 고칠 때마다 paintBar2가 다시 그린다 */
 function checks2() {
@@ -645,19 +660,43 @@ function renderG2() {
 }
 /* 확정: SHOT별 값을 CUT 단위로 합쳐 시트 조립 데이터에 넣고, 에셋 목록은 폴더 목록으로 바꾼다 */
 function commit2() {
-  S.D.assets = { BG: AL.BG, CH: AL.CH, PR: AL.PR, Matte: [] };
+  S.D.assets = Object.fromEntries(CATS.map(([k]) => [k, AL[k].map((a) => ({ ...a, ...(S.aattr[aKey(k, a.code)] || { rig: "", design: false, note: "" }) }))])); // 시트 Asset 탭의 원천
   const by = {}; shots2().forEach((x) => { if (!x.g.c) return; const v = S.sa[x.key], u = (by[x.g.id] = by[x.g.id] || { bg: new Set(), ch: new Set(), pr: new Set() }); ["bg", "ch", "pr"].forEach((k) => v[k].forEach((code) => u[k].add(code))); });
   S.D.cuts.forEach((c) => { const u = by[c.id] || { bg: [], ch: [], pr: [] }; c.bg = [...u.bg]; c.ch = [...u.ch]; c.pr = [...u.pr]; c.count = chCount(c.ch); });
 }
 function paintAssets() {
   const box = $("#assetBox"); box.replaceChildren(h("h2", {}, "에셋 목록"));
   if (!S.sa) { box.append(h("p", { class: "muted" }, "시리즈 에셋 폴더를 읽으면 폴더에 있는 에셋이 여기에 나옵니다.")); return; }
-  CATS.forEach(([k, t]) => { // 폴더에 있는 파일 이름만 보인다. 비어 있는 분류는 건너뛴다
+  box.append(h("p", { class: "muted", style: "font-size:12px;margin:0" }, "여기 적은 리깅, 디자인 필요, 비고는 시트의 Asset 탭에 들어갑니다."));
+  const redraw = () => { AL = aList(); paintAssets(); paintRows2(); };
+  CATS.forEach(([k, t]) => { // 폴더에 있는 에셋과 손으로 더한 에셋. 비어 있는 분류는 건너뛴다
     if (!AL[k].length) return;
     const g = h("div", { class: "agrp" }, h("h3", {}, t));
-    AL[k].forEach((a) => g.append(h("div", { class: "arow", style: "grid-template-columns:minmax(0,1fr)" }, h("div", { class: "nm" }, a.name))));
+    AL[k].forEach((a) => {
+      const at = (S.aattr[aKey(k, a.code)] = S.aattr[aKey(k, a.code)] || { rig: "", design: false, note: "" });
+      g.append(h("div", { class: "arow ast" },
+        h("div", { class: "nm" }, a.name, h("span", { class: "acode" }, a.code),
+          a.manual ? h("button", { class: "ax", "aria-label": a.name + " 빼기", onclick: () => { S.extra = S.extra.filter((x) => !(x.cat === k && x.code === a.code)); delete S.aattr[aKey(k, a.code)]; Object.values(S.sa).forEach((v) => ["bg", "ch", "pr"].forEach((q) => (v[q] = v[q].filter((x) => x !== a.code)))); redraw(); } }, "×") : null),
+        h("div", { class: "row", style: "gap:8px" },
+          h("select", { "aria-label": a.name + " 리깅", onchange: (e) => { at.rig = e.target.value; } }, h("option", { value: "" }, "리깅 미정"), ...S.lists.rig.map((o) => h("option", { value: o, selected: at.rig === o }, o + " " + (RIG_T[o] || "")))),
+          h("label", { class: "row", style: "gap:4px;font-size:13px" }, h("input", { type: "checkbox", checked: at.design, onchange: (e) => { at.design = e.target.checked; } }), "디자인 필요")),
+        h("input", { type: "text", value: at.note, placeholder: "비고", "aria-label": a.name + " 비고", onchange: (e) => { at.note = e.target.value.trim(); } })));
+    });
     box.append(g);
   });
+  // 폴더에 파일이 없는 에셋(컷마다 그리는 2D 이미지 배경 등)은 손으로 더한다. 더하면 SHOT 선택지에도 나온다
+  const cat = h("select", { "aria-label": "추가할 에셋 분류" }, ...CATS.map(([k, t]) => h("option", { value: k }, t)));
+  const nm = h("input", { type: "text", placeholder: "이름(국문)", "aria-label": "추가할 에셋 이름" }), cd = h("input", { type: "text", placeholder: "코드(영문)", "aria-label": "추가할 에셋 코드" });
+  const msg = h("p", { class: "muted", role: "status", style: "font-size:12px;margin:0" });
+  const add = () => {
+    const k = cat.value, name = nm.value.trim(), code = cd.value.trim();
+    if (!name || !A_ASCII.test(code)) { msg.textContent = "이름과 영문 코드를 적어 주세요. 코드에는 영문, 숫자, _, -만 씁니다."; return; }
+    if (CATS.some(([q]) => AL[q].some((a) => a.code === code))) { msg.textContent = `${code}는 이미 목록에 있습니다.`; return; }
+    S.extra.push({ cat: k, name, code }); redraw();
+  };
+  box.append(h("div", { class: "agrp aadd" }, h("h3", {}, "폴더에 없는 에셋 추가"),
+    h("p", { class: "muted", style: "font-size:12px;margin:0 0 6px" }, "폴더에 파일이 없는 에셋(컷마다 그리는 2D 이미지 배경 등)을 적습니다. 더한 에셋은 SHOT의 선택지에도 나옵니다."),
+    cat, nm, cd, h("button", { class: "btn", onclick: add }, "추가"), msg));
 }
 function paintFilters2() {
   const fl = $("#fl2"); fl.replaceChildren(); if (!S.sa) return;
@@ -673,9 +712,9 @@ function paintRows2() {
   rows.forEach((x) => box.append(row2(x)));
 }
 function chips(x, key, cat) {
-  const v = S.sa[x.key], nm = Object.fromEntries(AL[cat].map((a) => [a.code, a.name])), wrap = h("div", { class: "cell2" });
+  const v = S.sa[x.key], nm = Object.fromEntries(pool(cat).map((a) => [a.code, a.name])), wrap = h("div", { class: "cell2" });
   v[key].forEach((code, i) => { const r = v.rec[key].includes(code); wrap.append(h("span", { class: "chip" + (r ? " rec" : ""), title: (nm[code] || code) + (r ? " · 추천" : "") }, code, h("button", { "aria-label": code + " 빼기", onclick: () => { v[key].splice(i, 1); repaint2(x); } }, "×"))); });
-  const opts = AL[cat].filter((a) => !v[key].includes(a.code));
+  const opts = pool(cat).filter((a) => !v[key].includes(a.code));
   if (opts.length) wrap.append(h("select", { class: "addsel", "aria-label": x.id + " " + cat + " 추가", onchange: (e) => { if (e.target.value) { v[key].push(e.target.value); repaint2(x); } } }, h("option", { value: "" }, "+ 추가"), opts.map((a) => h("option", { value: a.code }, a.name))));
   return wrap;
 }
@@ -708,6 +747,9 @@ function renderReview3() {
       h("input", { type: "number", id: "fps", class: "fr", min: 1, max: 120, step: "0.01", value: FPS, required: true, "aria-required": "true", "aria-label": "러닝타임 계산 FPS",
         onchange: (e) => { const v = +e.target.value; if (v > 0 && v <= 120) { FPS = v; paintStats3(); paintRows3(); } else e.target.value = FPS; } }),
       h("span", { class: "muted", style: "font-weight:400;font-size:12px" }, `기본값은 스토리보드에 적힌 ${SB_META.fps}입니다`)),
+      h("button", { class: "btn", id: "wide3", "aria-pressed": String(WIDE), title: "페이지 폭 제한을 풀어 열 전체를 한 화면에 봅니다",
+        onclick: (e) => { const on = (WIDE = !WIDE); document.body.classList.toggle("wide", on); e.currentTarget.setAttribute("aria-pressed", String(on)); e.currentTarget.textContent = on ? "기본 폭으로" : "넓게 보기"; LS.set("wsWide", on ? "1" : ""); } },
+        WIDE ? "기본 폭으로" : "넓게 보기"),
       h("button", { class: "btn primary", id: "build3", disabled: true, onclick: () => { S.g3 = true; S.built = false; runBuild(); } }, "확정하고 시트 만들기")),
     listsCard(),
     h("div", { class: "card stats", id: "stats3" }),
@@ -742,6 +784,7 @@ const CAM_OPTS = ["PAN", "Q-PAN", "Z.I", "Q.Z.I", "Z.O", "S.Z.O", "T.U", "T.D", 
 const LIST_DEF = [["status", "LO·AN 상태", "LO, AN TK01~04, Render TK01~02",["수정", "완료", "진행중", "x", "101f 완료"]], ["rstatus", "Render·Comp 상태", "Render TK03~04, Comp TK01~05", ["수정", "완료", "진행중", "완료/FX대기", "X"]],
   ["ver", "AN 완료 버전", "AN 완료", ["V01", "V02", "V03", "V04", "V05"]], ["an", "LO·AN 작업자", "LO·AN 작업자", ["송민주", "김은엽", "임선형", "윤지민", "탁진영"]],
   ["render", "Render 작업자", "Render 작업자", ["김지희", "심미림"]], ["comp", "Comp 작업자", "Comp 작업자", ["정승환", "김유진"]],
+  ["rig", "리깅", "Asset 탭 리깅 열. ○ 리깅 완료, △ 리깅 중, □ 리깅 요청 필요", ["○", "△", "□"]],
   ["cam", "Cam Move", "워크시트 표의 Cam Move '+ 선택'에 씁니다. 엑셀 C열은 한 칸에 여러 값을 적으므로 드롭다운을 걸지 않습니다.", CAM_OPTS]];
 S.lists = (() => { let v = {}; try { v = JSON.parse(LS.get("wsLists") || "{}") || {}; } catch (e) {} return Object.fromEntries(LIST_DEF.map(([k, , , d]) => [k, Array.isArray(v[k]) ? v[k] : [...d]])); })();
 const listsOk = () => LIST_DEF.every(([k]) => S.lists[k].length > 0);
@@ -1015,7 +1058,7 @@ const saveCheck = (kind, title) => {
 async function saveRequest() {
   S.req = { st: "busy" };
   try {
-    const F = await epFolders(), body = JSON.stringify({ title: curTitle(), series: series(), ep: S.D.ep, runtime: S.D.runtime, target: S.D.target, fps: FPS, lists: S.lists, cuts: S.D.cuts.map(({ thumb, ...c }) => c) });
+    const F = await epFolders(), body = JSON.stringify({ title: curTitle(), series: series(), ep: S.D.ep, runtime: S.D.runtime, target: S.D.target, fps: FPS, lists: S.lists, assets: S.D.assets, cuts: S.D.cuts.map(({ thumb, ...c }) => ({ ...c, ra: Array.from({ length: c.split || 1 }, (_, i) => { const v = (S.sa && S.sa[c.id + "#" + i]) || c; return { bg: v.bg || [], ch: v.ch || [], pr: v.pr || [], count: chCount(v.ch || []) }; }) })) }); // ra: 시트 행마다 3단계 에셋
     await F.mcp.callTool("Google Drive", "create_file", { title: "cuts.json", parentId: F.work, contentMimeType: "application/json", textContent: body, disableConversionToGoogleType: true }, { cache: false });
     S.req = { st: "ok", inp: folderUrl(F.inp), out: folderUrl(F.out), work: folderUrl(F.work) };
   } catch (e) { S.req = { st: "bad", msg: driveErr(e) }; }

@@ -13,7 +13,7 @@
 """
 import re, sys
 
-KIND = {"BG": "BG", "배경": "BG", "CH": "CH", "캐릭터": "CH", "PR": "PR", "소품": "PR", "프롭": "PR"}
+KIND = {"BG": "BG", "배경": "BG", "CH": "CH", "캐릭터": "CH", "PR": "PR", "소품": "PR", "프롭": "PR", "Matte": "Matte", "매트": "Matte", "2D": "2D", "2DBG": "2D"}
 WORD = {"에디": "Eddy", "뽀로로": "Pororo", "루피": "Loopy", "크롱": "Crong", "패티": "Petty", "포비": "Poby", "해리": "Harry",
         "내부": "In", "외부": "Out", "집": "", "눈길": "SnowRoad", "낮": "SkyDay", "밤": "SkyNight", "아침": "SkyMorning"}
 IMAGE = re.compile(r"\.(png|jpe?g|svg|ai|psd|webp)$", re.I)
@@ -37,12 +37,12 @@ def to_code(stem):
 
 
 def kind_of(path):
-    return next((KIND[p] for p in path.split("/")[:-1] if p in KIND), None)
+    return next((KIND[p] for p in reversed(path.split("/")[:-1]) if p in KIND), None)  # 가장 깊은 폴더: BG/Matte/x.png → Matte
 
 
 def from_folders(files):
     """-> (assets {"BG": {이름: 코드}, ...}, unresolved [경로], skipped [경로])"""
-    assets, src, unresolved, skipped = {"BG": {}, "CH": {}, "PR": {}}, {}, [], []
+    assets, src, unresolved, skipped = {"BG": {}, "CH": {}, "PR": {}, "Matte": {}, "2D": {}}, {}, [], []
     for f in sorted(files, key=lambda f: f["folder"] == "episode"):  # 화수 폴더를 나중에 처리해 덮어씀
         path = f["path"].replace("\\", "/")
         kind = kind_of(path)
@@ -72,5 +72,7 @@ if __name__ == "__main__":
     assert bad == ["PR/썰매.png", "PR/크리스마스트리.png"] and skip == ["메모.txt"], (bad, skip)
     a2, bad2, _ = from_folders([{"folder": "series", "path": p} for p in
                                 ["BG/LoopyIn_CookingTable_루피 집 내부.png", "PR/Cbbo_곰인형_파랑.png", "CH/BabyPororo_Christmas_아기 뽀로로 1 - 10.png"]])
-    assert a2 == {"BG": {"루피 집 내부": "LoopyIn_CookingTable"}, "PR": {"곰인형_파랑": "Cbbo"}, "CH": {"아기 뽀로로 1 - 10": "BabyPororo_Christmas"}} and not bad2, a2
+    assert a2 == {"BG": {"루피 집 내부": "LoopyIn_CookingTable"}, "PR": {"곰인형_파랑": "Cbbo"}, "CH": {"아기 뽀로로 1 - 10": "BabyPororo_Christmas"}, "Matte": {}, "2D": {}} and not bad2, a2
+    a3, _, _ = from_folders([{"folder": "series", "path": p} for p in ["BG/Matte/SkyNight.png", "Matte/노을.png", "BG/2DBG/Santashadow.png"]])
+    assert a3["Matte"] == {"SkyNight": "SkyNight", "노을": "노을"} and a3["2D"] == {"Santashadow": "Santashadow"} and not a3["BG"], a3  # 가장 깊은 폴더로 분류
     print("ok", a, bad, skip)

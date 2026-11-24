@@ -14,9 +14,11 @@ BABY = re.compile(r"아기\s?뽀로로\s?([0-9][0-9~,\s/부터까지\-]*)?|아�
 
 
 def load_assets(xlsx):
+    if xlsx in (None, "-"):  # 3단계 목록(overrides의 assets)만 쓸 때
+        return {"BG": {}, "CH": {}, "PR": {}, "Matte": {}, "2D": {}}
     a = openpyxl.load_workbook(xlsx).worksheets[1]
-    cat, out = None, {"BG": {}, "CH": {}, "PR": {}, "Matte": {}}
-    for r in range(3, 60):
+    cat, out = None, {"BG": {}, "CH": {}, "PR": {}, "Matte": {}, "2D": {}}
+    for r in range(3, a.max_row + 1):
         n, code = a.cell(r, 1).value, a.cell(r, 2).value
         if n in out and code is None:
             cat = n

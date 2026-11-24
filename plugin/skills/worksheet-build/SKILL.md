@@ -22,7 +22,8 @@ description: 콘솔에서 확정한 에피소드의 Worksheet xlsx를 만들어 
 
 1. `download_file_content`로 `cuts.json`과 `00_입력`의 시나리오(docx)를 받는다.
 2. 스토리보드 PDF가 7MB를 넘으면 커넥터로 받지 못한다(ADR 0006). PD PC의 Drive 동기화 폴더(`G:\`)에서 같은 경로의 파일을 쓴다. 찾지 못하면 PD에게 로컬 경로를 묻는다.
-3. 에셋 목록 xlsx(EP12는 정답 시트의 Asset 탭)는 PD에게 경로를 받는다.
+3. 에셋은 콘솔 3단계에서 확정한 목록(`cuts.json`의 `assets`)을 쓴다. 에셋마다 `fileId`를 `download_file_content`로 받아 새 빈 폴더 `aimg/`에 `<code>.<확장자>`(png·jpg·jpeg·webp)로 저장한다. 7MB가 넘는 파일은 건너뛰고 PD에게 코드를 알린다(그 칸은 비어서 올라간다). `fileId`가 없는 에셋(손으로 더한 에셋)은 이미지 없이 둔다.
+4. `assets`가 없는 옛 `cuts.json`이면 PD에게 에셋 목록 xlsx(EP12는 정답 시트의 Asset 탭) 경로를 받는다. 이때 Asset 탭은 그 xlsx를 복사하고, BG·CH·PR 열은 시나리오에서 다시 도출한다.
 
 ## 3. 조립과 검증
 
@@ -32,11 +33,12 @@ python -I console_overrides.py <cuts.json> <o.json>
 표준 출력으로 나온 인자(`--ep`, `--runtime-min`, `--target-cuts`)를 아래 명령에 붙인다.
 
 ```
-python -I thumbnails.py <스토리보드.pdf> <에셋.xlsx> <thumbs폴더>
-python -I build_worksheet.py <시나리오.docx> <thumbs폴더> <에셋.xlsx> <out.xlsx> --overrides <o.json> <위 인자>
+python -I thumbnails.py <스토리보드.pdf> <정답 시트.xlsx> <thumbs폴더>
+python -I build_worksheet.py <시나리오.docx> <thumbs폴더> - <out.xlsx> --overrides <o.json> --asset-images <aimg폴더> <위 인자>
 python -I verify_worksheet.py <out.xlsx> <out.summary.json>
 ```
 
+- `-` 자리는 에셋 목록 xlsx다. 옛 `cuts.json`(2-4)이면 그 경로를 넣고 `--asset-images`를 뺀다.
 - FAIL이 있으면 올리기 전에 PD에게 항목을 그대로 보여 준다. 러닝타임 FAIL은 추정 Frame 때문일 수 있어 PD가 올릴지 정한다. 다른 FAIL은 고친 뒤 다시 조립한다.
 - 썸네일 컷 번호 규칙은 EP12에서 육안으로 맞춘 것이다(`thumbnails.ep12_label`). 다른 에피소드는 label_sheets.py로 접촉 시트를 만들어 번호를 먼저 확인한다.
 
@@ -54,4 +56,4 @@ python -I verify_worksheet.py <out.xlsx> <out.summary.json>
 
 ## 아직 넘기지 않는 값
 
-콘솔에서 고친 Same Camera, Cam Move, BG·CH·PR은 cuts.json에 들어 있지만 build_worksheet.py가 시나리오에서 다시 도출한다. 이 값이 달라졌으면 올린 뒤 시트에서 고치게 PD에게 알린다.
+콘솔에서 고친 Same Camera, Cam Move는 cuts.json에 들어 있지만 build_worksheet.py가 시나리오에서 다시 도출한다. BG·CH·PR과 Asset 탭은 3단계 값을 그대로 쓴다. 이 값이 달라졌으면 올린 뒤 시트에서 고치게 PD에게 알린다.

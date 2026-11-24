@@ -6,9 +6,12 @@
 - 요약은 별도 '요약' 탭에 둔다(2026-11-23 협의). 시트 맨 아래 요약 행은 만들지 않는다. 범위는 마지막 행까지 동적이다.
 - 방영 길이(분)와 목표 컷 수(EP12는 166)는 시나리오와 함께 받는 고정 입력이다. 행 수(분할 포함)는 PD가 썸네일을 보고 분할을 정해야 확정되는 결과라 입력이 아니다. 요약 탭이 총 러닝타임과 컷 수를 이 값과 견준다.
 - 공정 열(LO·AN·Render·Comp)은 드롭다운만 만들고 작업자는 비워 둔다.
-사용: python -I build_worksheet.py <docx> <thumbs_dir> <asset_xlsx> <out.xlsx> [--ep 12] [--overrides o.json] [--fit golden.xlsx] [--runtime-min 10] [--target-cuts 166] [--tol-min 0.5]
+사용: python -I build_worksheet.py <docx> <thumbs_dir> <asset_xlsx|-> <out.xlsx> [--asset-images DIR] [--ep 12] [--overrides o.json] [--fit golden.xlsx] [--runtime-min 10] [--target-cuts 166] [--tol-min 0.5]
 overrides.json: {"splits": {"11": 2}, "frames": {"C001": 120}, "estimated": ["C001"], "starts": {"C001b": 151}, "fps": 24, "workers": {...}, "lists": {"an": ["송민주", ...]}}  (게이트 1·2에서 PD가 정한 값)
-  lists: 워크시트 드롭다운 목록(status·rstatus·ver·an·render·comp). 콘솔의 '워크시트 드롭다운 목록'에서 PD가 고친 값이고, 없는 키는 LISTS 기본값을 쓴다. cam(Cam Move)은 콘솔 선택지용이라 시트에 드롭다운을 걸지 않는다(한 칸에 여러 값).
+  assets: 3단계에서 확정한 에셋 목록 {"BG": [{"name","code","path","fileId","rig","design","note","manual"}], "CH": …, "PR": …, "Matte": …, "2D": …}.
+    있으면 Asset 탭을 이 목록으로 그리고(렌더 이미지는 --asset-images 폴더의 <코드>.png|jpg), 없으면 asset_xlsx의 Asset 탭을 복사한다.
+  rowassets: 시트 행별 {"C001a": {"bg": [...], "ch": [...], "pr": [...], "count": 1}}. 있으면 시나리오 도출값 대신 쓴다.
+  lists: 워크시트 드롭다운 목록(status·rstatus·ver·an·render·comp·rig). rig는 Asset 탭 리깅 열. 콘솔의 '워크시트 드롭다운 목록'에서 PD가 고친 값이고, 없는 키는 LISTS 기본값을 쓴다. cam(Cam Move)은 콘솔 선택지용이라 시트에 드롭다운을 걸지 않는다(한 칸에 여러 값).
 """
 import re, sys, os, json, argparse, pathlib
 import numpy as np
@@ -44,7 +47,8 @@ for k in range(2, 5):  # EP12 시트: Render TK01·TK02는 LO·AN 상태 목록,
     PROC += [(f"Render TK0{k}", "status" if k == 2 else "rstatus"), ("요청사항", None)]
 for k in range(1, 6):
     PROC += [(f"Comp TK0{k}", "rstatus"), ("작업자", "comp")]
-LISTS = {"status": STATUS, "rstatus": RSTATUS, "ver": VERS, "an": WORKERS["an"], "render": WORKERS["render"], "comp": WORKERS["comp"]}
+RIG = ["○", "△", "□"]  # Asset 탭 리깅 열. 범례(K2:N3): ○ 리깅 완료, △ 리깅 중, □ 리깅 요청 필요
+LISTS = {"status": STATUS, "rstatus": RSTATUS, "ver": VERS, "an": WORKERS["an"], "render": WORKERS["render"], "comp": WORKERS["comp"], "rig": RIG}
 
 
 def picklists(overrides):
@@ -98,7 +102,7 @@ def derive(docx_path, asset_xlsx, overrides):
             ch.insert(0, "BabyPororo_Christmas_" + ranges(babies))
         bg = []
         for code in bg_codes(c["place"], text):
-            hit = resolve(code, assets["BG"]) or resolve(code, assets["Matte"])
+            hit = resolve(code, assets["BG"]) or resolve(code, assets["Matte"]) or resolve(code, assets["2D"])
             if hit:
                 bg.append(hit)
             else:
@@ -118,6 +122,13 @@ def derive(docx_path, asset_xlsx, overrides):
                          "bg": bg, "ch": ch, "pr": pr, "count": len(mine) + len(babies), "dialogue": c["dialogue"] if i == 0 else "",
                          "description": desc if i == 0 else "", "feat": features(c, len(mine) + len(babies)) if i == 0 else features({"dialogue": "", "description": ""}, 0),
                          "split": k > 1, "dup": bool(ref)})
+    ra, al = overrides.get("rowassets") or {}, overrides.get("assets") or {}
+    for r in rows:  # 3단계에서 PD가 확정한 값이 시나리오 도출값보다 앞선다
+        if r["id"] in ra:
+            r.update({k: list(ra[r["id"]][k]) for k in ("bg", "ch", "pr")}, count=int(ra[r["id"]].get("count", 0)))
+    if al:  # 확정 목록 기준으로 다시 센다: 시트 열의 코드가 Asset 탭에 없으면 '확정되지 않은 에셋 코드'
+        codes = {a["code"] for v in al.values() for a in v}
+        unknown = {c for r in rows for k in ("bg", "ch", "pr") for c in r[k] if c not in codes and not any(c.startswith(x + "_") for x in codes)}
     return parsed, rows, sorted(unknown)
 
 
@@ -158,7 +169,75 @@ def shrink(data, px=480):
     return out
 
 
-def copy_asset_sheet(asset_xlsx, wb):
+ASSET_CATS = ["BG", "CH", "PR", "Matte", "2D"]
+ASSET_HEADS = ["Asset Name(국문)", "Asset Code(영문)", "경로", "제작자", "설명", "렌더 이미지", "비고", "디자인 필요 여부", "리깅"]
+
+
+def draw_asset_sheet(assets, wb, title="", rig=RIG, images=None):
+    """3단계(에셋)에서 확정한 목록으로 Asset 탭을 그린다. 모양은 EP12 Asset 탭을 따른다:
+    제목 행, 머리글 9열(제작자·설명은 숨김), 분류 행 BG·CH·PR·Matte·2D, 리깅 범례 K2:N3, 리깅 열 드롭다운.
+    렌더 이미지는 images 폴더의 <코드>.png|jpg|jpeg|webp를 F열 셀 안에 맞춰 넣는다. 없으면 비워 둔다.
+    디자인 필요 여부는 콘솔 체크를 ○로 적는다(가정: 토스트 확인 전)."""
+    from openpyxl.styles import Border, Side
+    from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
+    from openpyxl.drawing.xdr import XDRPositiveSize2D
+    wa = wb.create_sheet("Asset")
+    thin = Side(style="thin", color="FF000000")
+    box = Border(left=thin, right=thin, top=thin, bottom=thin)
+    mid = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    wa["A1"], wa["B1"] = title, "Asset \nList"
+    wa["A1"].font, wa["B1"].font, wa["B1"].alignment = Font(bold=True, size=36), Font(size=22), mid
+    wa.row_dimensions[1].height = 125.25
+    for c, t in enumerate(ASSET_HEADS, 1):
+        x = wa.cell(2, c, t)
+        x.font, x.fill, x.alignment, x.border = Font(bold=True, size=18 if c < 9 else 16), PatternFill("solid", fgColor="FF8DB5F8"), mid, box
+    wa.row_dimensions[2].height = 39
+    for r, (k, v) in enumerate([("리깅 완료", "○"), ("리깅 중", "△")], 2):
+        wa.cell(r, 11, k); wa.cell(r, 12, v)
+    wa.cell(2, 13, "리깅 요청 필요"); wa.cell(2, 14, "□")
+    for k, w in {"A": 45.5, "B": 51.13, "C": 37, "D": 15.13, "E": 31.63, "F": 66, "G": 60.13, "H": 34.88, "I": 16.75, "K": 24.5, "L": 13.75, "M": 19.75, "N": 13.5}.items():
+        wa.column_dimensions[k].width = w
+    wa.column_dimensions["D"].hidden = wa.column_dimensions["E"].hidden = True
+    green = PatternFill("solid", fgColor="FFC6EFCE")
+    RH, EMU = 150, 9525  # 에셋 행 높이(pt). 렌더 이미지는 F열(66폭, 약 467px) x 200px 안에 맞춘다
+    cw, rh = 66 * 7 + 5, RH * 96 / 72
+    r, placed = 3, 0
+    for cat in ASSET_CATS:
+        x = wa.cell(r, 1, cat)
+        x.font, x.fill = Font(bold=True, size=28), PatternFill("solid", fgColor="FFD9E6FC")
+        for c in range(1, 10):
+            wa.cell(r, c).border = box
+        wa.row_dimensions[r].height = 47.25
+        r += 1
+        for a in assets.get(cat) or []:
+            vals = [a.get("name", ""), a.get("code", ""), a.get("path") or "", None, None, None, a.get("note") or None, "○" if a.get("design") else None, a.get("rig") or None]
+            for c, v in enumerate(vals, 1):
+                x = wa.cell(r, c, v)
+                x.alignment, x.border = mid, box
+                x.font = Font(bold=c == 2, size={1: 14, 2: 18, 3: 11, 9: 36}.get(c, 12))
+            if a.get("rig") == "○":
+                wa.cell(r, 9).fill = green
+            wa.row_dimensions[r].height = RH
+            src = next((p for p in (pathlib.Path(images) / f"{a.get('code')}{e}" for e in (".png", ".jpg", ".jpeg", ".webp")) if p.exists()), None) if images else None
+            if src:
+                data = shrink(src.read_bytes())
+                from PIL import Image as PILImage
+                w, h = PILImage.open(data).size
+                data.seek(0)
+                k = min((cw - 8) / w, (rh - 8) / h)
+                im = XlImage(data)
+                im.width, im.height = int(w * k), int(h * k)
+                im.anchor = OneCellAnchor(_from=AnchorMarker(col=5, colOff=4 * EMU, row=r - 1, rowOff=4 * EMU), ext=XDRPositiveSize2D(int(w * k * EMU), int(h * k * EMU)))
+                wa.add_image(im)
+                placed += 1
+            r += 1
+    dv = DataValidation(type="list", formula1='"' + ",".join(rig) + '"', allow_blank=True)
+    wa.add_data_validation(dv)
+    dv.add(f"I3:I{max(3, r - 1)}")
+    return wa, placed
+
+
+def copy_asset_sheet(asset_xlsx, wb, rig=RIG):
     """에셋 목록 파일의 Asset 시트(둘째 탭)를 값·서식·열 폭·행 높이·숨긴 열·렌더 이미지째 옮긴다.
     EP12 시트의 Asset 탭과 같은 모양(제목, 머리글 9열, BG·CH·PR·Matte·2D 분류 행, 리깅 범례 K2:N3)을 그대로 쓰기 위해서다.
     ponytail: 입력 파일이 이 형식이라는 전제(load_assets와 같음). 폴더에서만 에셋을 받는 경우는 그때 서식을 새로 그린다."""
@@ -182,14 +261,47 @@ def copy_asset_sheet(asset_xlsx, wb):
     for r, dim in src.row_dimensions.items():
         if dim.height:
             wa.row_dimensions[r].height = dim.height
+    # 렌더 이미지: 원본(Google Sheets 내보내기)은 여러 이미지를 1행 기준의 큰 오프셋으로 놓아, 그대로 옮기면 Google Sheet에서
+    # 엉뚱한 행에 뜨고 셀 밖으로 넘친다. 오프셋을 행 높이·열 폭으로 풀어 실제 셀에 다시 앉히고, 그 셀 안에 들도록 비율대로 줄인다.
+    from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
+    from openpyxl.drawing.xdr import XDRPositiveSize2D
+    from openpyxl.utils import column_index_from_string
+    dh, dw = src.sheet_format.defaultRowHeight or 15, src.sheet_format.defaultColWidth or 8.43
+    colw = {}
+    for k, dim in src.column_dimensions.items():
+        lo = dim.min or column_index_from_string(k)
+        for c in range(lo, (dim.max or lo) + 1):
+            colw[c] = 0 if dim.hidden else (dim.width or dw) * 7 + 5
+    cw = lambda c: colw.get(c, dw * 7 + 5)
+    rh = lambda r: (src.row_dimensions[r].height or dh) * 96 / 72
+    def walk(i, off, size):
+        while off >= size(i):
+            off -= size(i)
+            i += 1
+        return i, off
+    EMU = 9525
     for im in src._images:
+        a = im.anchor
+        r, ro = walk(a._from.row + 1, a._from.rowOff / EMU, rh)
+        c, co = walk(a._from.col + 1, a._from.colOff / EMU, cw)
+        w, h = (a.ext.width / EMU, a.ext.height / EMU) if getattr(a, "ext", None) else (im.width, im.height)
+        if cw(c) - co < 40 or rh(r) - ro < 40:  # 셀 끝에 걸친 이미지는 셀 왼쪽 위로 당긴다
+            co = ro = 2
+        k = min(1, (cw(c) - co - 4) / w, (rh(r) - ro - 4) / h)
         x = XlImage(shrink(im._data()))
-        x.anchor = copy(im.anchor)
+        x.width, x.height = int(w * k), int(h * k)
+        x.anchor = OneCellAnchor(_from=AnchorMarker(col=c - 1, colOff=int(co * EMU), row=r - 1, rowOff=int(ro * EMU)), ext=XDRPositiveSize2D(int(w * k * EMU), int(h * k * EMU)))
         wa.add_image(x)
+    # 리깅 열 드롭다운: 범례의 ○ 리깅 완료 / △ 리깅 중 / □ 리깅 요청 필요
+    col = next((c for c in range(1, src.max_column + 1) if src.cell(2, c).value == "리깅"), None)
+    if col:
+        dv = DataValidation(type="list", formula1='"' + ",".join(rig) + '"', allow_blank=True)
+        wa.add_data_validation(dv)
+        dv.add(f"{L(col)}3:{L(col)}{src.max_row}")
     return wa
 
 
-def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, target_cuts=None, tol_min=0.5):
+def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, target_cuts=None, tol_min=0.5, asset_images=None):
     parsed, rows, unknown = derive(docx_path, asset_xlsx, overrides)
     lists = picklists(overrides)
     wb = openpyxl.Workbook()
@@ -235,7 +347,10 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
     for k, v in widths.items():
         ws.column_dimensions[k].width = v
     ws.freeze_panes = "C2"
-    copy_asset_sheet(asset_xlsx, wb)
+    if overrides.get("assets"):  # 3단계에서 확정한 목록이 원천
+        draw_asset_sheet(overrides["assets"], wb, overrides.get("title", ""), lists["rig"], asset_images)
+    else:  # 콘솔을 거치지 않은 시험 조립: 에셋 목록 xlsx의 Asset 탭을 그대로 옮긴다
+        copy_asset_sheet(asset_xlsx, wb, lists["rig"])
     # 요약 탭: 고정 입력(방영 길이, 목표 행 수), 합계 검증, 작업자별 집계
     sm = wb.create_sheet("요약")
     n_cuts = len(parsed["cuts"])
@@ -278,11 +393,11 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser()
     ap.add_argument("docx"); ap.add_argument("thumbs"); ap.add_argument("assets"); ap.add_argument("out")
-    ap.add_argument("--ep", default="12"); ap.add_argument("--overrides"); ap.add_argument("--fit"); ap.add_argument("--runtime-min", type=float, default=10); ap.add_argument("--target-cuts", type=int); ap.add_argument("--tol-min", type=float, default=0.5)
+    ap.add_argument("--ep", default="12"); ap.add_argument("--overrides"); ap.add_argument("--fit"); ap.add_argument("--runtime-min", type=float, default=10); ap.add_argument("--target-cuts", type=int); ap.add_argument("--tol-min", type=float, default=0.5); ap.add_argument("--asset-images")
     a = ap.parse_args()
     if a.fit:
         print("fit coef:", [round(x, 3) for x in fit(a.fit, a.docx, a.assets)])
     ov = json.loads(pathlib.Path(a.overrides).read_text(encoding="utf-8")) if a.overrides else {}
-    s = build(a.docx, a.thumbs, a.assets, a.out, a.ep, ov, a.runtime_min, a.target_cuts, a.tol_min)
+    s = build(a.docx, a.thumbs, a.assets, a.out, a.ep, ov, a.runtime_min, a.target_cuts, a.tol_min, a.asset_images)
     pathlib.Path(a.out).with_suffix(".summary.json").write_text(json.dumps(s, ensure_ascii=False, indent=1), encoding="utf-8")
     print(s)

@@ -20,6 +20,13 @@ def verify(path, summary=None):
 
     head = [wb["Asset"].cell(2, c).value for c in range(1, 10)]
     add("Asset 탭이 EP12 형식(머리글 9열)", head == ["Asset Name(국문)", "Asset Code(영문)", "경로", "제작자", "설명", "렌더 이미지", "비고", "디자인 필요 여부", "리깅"], str(head))
+    wa = wb["Asset"]
+    rig = [dv for dv in wa.data_validations.dataValidation if str(dv.sqref).startswith("I3:")]
+    add("Asset 리깅 열에 ○·△·□ 드롭다운", rig and all(x in rig[0].formula1 for x in "○△□"), str(rig[0].formula1) if rig else "없음")
+    colpx = lambda c: (wa.column_dimensions[openpyxl.utils.get_column_letter(c)].width or 13) * 7 + 5
+    rowpx = lambda r: (wa.row_dimensions[r].height or 15) * 96 / 72
+    over = [im.anchor._from.row + 1 for im in wa._images if im.anchor.ext.width / 9525 + im.anchor._from.colOff / 9525 > colpx(im.anchor._from.col + 1) + 1 or im.anchor.ext.height / 9525 + im.anchor._from.rowOff / 9525 > rowpx(im.anchor._from.row + 1) + 1]
+    add("Asset 렌더 이미지가 셀 안에 듦", not over, f"넘치는 행 {over[:5]}")
     add("행 ID 중복 없음", len(ids) == len(set(ids)), f"{len(ids)}행")
     add("컷 번호 연속(C001~)", sorted({int(re.match(r"C(\d+)", i).group(1)) for i in ids}) == list(range(1, max(int(re.match(r"C(\d+)", i).group(1)) for i in ids) + 1)))
     # EP12 시트와 같이 Start·End는 값, Frame = End - Start + 1, Sec = ROUND(Frame/FPS,1). FPS는 첫 행 수식에서 읽는다
