@@ -14,7 +14,8 @@
 - `plugin/scripts/`: 결정적 코드. 대본 파싱(`parse_docx.py`), 콘티 칸 분할(`panel_split.py`), 썸네일, 에셋 도출(`extract_assets.py`, `folder_assets.py`), 시트 조립(`build_worksheet.py`), 검증(`verify_worksheet.py`), 평가(`eval_rows.py`), Frame 추정 계수(`frame_model.json`)
 - `plugin/console/`: 시연용 콘솔 artifact 원본(`console.html`), 로고, Pretendard 글꼴. 시연 데이터(`cuts·thumbs·panels·work.json`)는 EP12 원본에서 만든 것이라 git에서 제외했고(`.gitignore`), `console_data.py`·`storyboard_panels.py`·`work_data.py`로 다시 만든다. 게시본은 artifact `AGBNkhgLQkdopHBhSc3eSy`
 - `plugin/assets/`: 토스트 로고
-- `plugin/skills/`, `plugin/agents/`, `plugin/hooks/`: 아직 없음. PLAN.md §7 구성대로 만든다
+- `plugin/skills/worksheet-build/`: 콘솔이 02_작업에 남긴 cuts.json으로 xlsx를 만들어 01_산출에 Google Sheet로 올리는 절차(`console_overrides.py` → build → verify → Drive `create_file`)
+- `plugin/agents/`, `plugin/hooks/`: 아직 없음. PLAN.md §7 구성대로 만든다
 
 ## 고객 원본(이 저장소에 두지 않음)
 

@@ -1,13 +1,13 @@
 """Phase 2: 컷 목록(대본 + 규칙 + PD 결정)으로 Worksheet xlsx를 조립한다. Drive에 올리면 Google Sheet로 변환된다.
 
 계산은 모두 이 스크립트가 한다(AI가 숫자를 쓰지 않는다).
-- Sec = ROUND(Frame/29.97,1), Start Frame = 101, End Frame = Start + Frame - 1 (수식)
-- Frame은 추정 모델의 초안이며 노란색으로 표시한다. PD가 고치면 일반색으로 바꿔도 된다.
+- Start Frame(기본 101)과 End Frame은 값이고, Frame = End - Start + 1, Sec = ROUND(Frame/FPS,1)은 수식이다(EP12 시트와 같음). FPS는 overrides의 fps, 없으면 29.97
+- Frame 추정값은 End Frame에 들어가며 노란색으로 표시한다. PD가 End를 고치면 일반색으로 바꿔도 된다.
 - 요약은 별도 '요약' 탭에 둔다(2026-11-23 협의). 시트 맨 아래 요약 행은 만들지 않는다. 범위는 마지막 행까지 동적이다.
 - 방영 길이(분)와 목표 컷 수(EP12는 166)는 시나리오와 함께 받는 고정 입력이다. 행 수(분할 포함)는 PD가 썸네일을 보고 분할을 정해야 확정되는 결과라 입력이 아니다. 요약 탭이 총 러닝타임과 컷 수를 이 값과 견준다.
 - 공정 열(LO·AN·Render·Comp)은 드롭다운만 만들고 작업자는 비워 둔다.
 사용: python -I build_worksheet.py <docx> <thumbs_dir> <asset_xlsx> <out.xlsx> [--ep 12] [--overrides o.json] [--fit golden.xlsx] [--runtime-min 10] [--target-cuts 166] [--tol-min 0.5]
-overrides.json: {"splits": {"11": 2}, "frames": {"C001": 120}, "workers": {...}, "lists": {"an": ["송민주", ...]}}  (게이트 1·2에서 PD가 정한 값)
+overrides.json: {"splits": {"11": 2}, "frames": {"C001": 120}, "estimated": ["C001"], "starts": {"C001b": 151}, "fps": 24, "workers": {...}, "lists": {"an": ["송민주", ...]}}  (게이트 1·2에서 PD가 정한 값)
   lists: 작업현황 드롭다운 목록(status·rstatus·ver·an·render·comp). 콘솔의 '작업현황 드롭다운 목록'에서 PD가 고친 값이고, 없는 키는 LISTS 기본값을 쓴다. cam(Cam Move)은 콘솔 선택지용이라 시트에 드롭다운을 걸지 않는다(한 칸에 여러 값).
 """
 import re, sys, os, json, argparse, pathlib
@@ -113,7 +113,7 @@ def derive(docx_path, asset_xlsx, overrides):
         prev_place = c["place"]
         desc = (place + "\n" if place else "") + c["description"] + (("\n" + c["transition"]) if c["transition"] else "")
         for i in range(k):
-            cid = "C%03d" % n + ("abcd"[i] if k > 1 else "")
+            cid = "C%03d" % n + ("abcdefghij"[i] if k > 1 else "")  # 콘솔은 컷 하나를 10행까지 나눈다
             rows.append({"cut": n, "id": cid, "first": i == 0, "cam": cam if i == 0 else [], "same": same_camera(c["description"]) if i == 0 else "",
                          "bg": bg, "ch": ch, "pr": pr, "count": len(mine) + len(babies), "dialogue": c["dialogue"] if i == 0 else "",
                          "description": desc if i == 0 else "", "feat": features(c, len(mine) + len(babies)) if i == 0 else features({"dialogue": "", "description": ""}, 0),
@@ -143,6 +143,52 @@ def estimate(feat):
     return int(min(300, max(24, round(float(np.dot(w, feat))))))
 
 
+def shrink(data, px=480):
+    """렌더 이미지(EP12는 1920x1080 PNG 63장, 29MB)를 셀 크기에 맞게 줄인다. 크기는 anchor가 정하므로 화면 모양은 같다.
+    시트가 Drive 커넥터 한도(요청 본문 10MB, 파일 약 7MB) 안에 들어와야 01_산출에 Google Sheet로 올릴 수 있다."""
+    from io import BytesIO
+    from PIL import Image as PILImage
+    im, out = PILImage.open(BytesIO(data)), BytesIO()
+    im.thumbnail((px, px))
+    if im.mode in ("RGBA", "LA", "P"):
+        im.save(out, "PNG", optimize=True)
+    else:
+        im.convert("RGB").save(out, "JPEG", quality=85)
+    out.seek(0)
+    return out
+
+
+def copy_asset_sheet(asset_xlsx, wb):
+    """에셋 목록 파일의 Asset 시트(둘째 탭)를 값·서식·열 폭·행 높이·숨긴 열·렌더 이미지째 옮긴다.
+    EP12 시트의 Asset 탭과 같은 모양(제목, 머리글 9열, BG·CH·PR·Matte·2D 분류 행, 리깅 범례 K2:N3)을 그대로 쓰기 위해서다.
+    ponytail: 입력 파일이 이 형식이라는 전제(load_assets와 같음). 폴더에서만 에셋을 받는 경우는 그때 서식을 새로 그린다."""
+    from copy import copy
+    from io import BytesIO
+    src = openpyxl.load_workbook(asset_xlsx).worksheets[1]
+    wa = wb.create_sheet("Asset")
+    for row in src.iter_rows():
+        for s in row:
+            if s.value is None and not s.has_style:
+                continue
+            d = wa.cell(s.row, s.column, s.value)
+            if s.has_style:
+                d.font, d.fill, d.border, d.alignment = copy(s.font), copy(s.fill), copy(s.border), copy(s.alignment)
+                d.number_format, d.protection = s.number_format, copy(s.protection)
+            if s.hyperlink:
+                d.hyperlink = copy(s.hyperlink)
+    for k, dim in src.column_dimensions.items():
+        cd = wa.column_dimensions[k]
+        cd.width, cd.hidden, cd.min, cd.max = dim.width, dim.hidden, dim.min, dim.max
+    for r, dim in src.row_dimensions.items():
+        if dim.height:
+            wa.row_dimensions[r].height = dim.height
+    for im in src._images:
+        x = XlImage(shrink(im._data()))
+        x.anchor = copy(im.anchor)
+        wa.add_image(x)
+    return wa
+
+
 def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, target_cuts=None, tol_min=0.5):
     parsed, rows, unknown = derive(docx_path, asset_xlsx, overrides)
     lists = picklists(overrides)
@@ -159,13 +205,14 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
     est_rows = 0
     for i, r in enumerate(rows, start=2):
         frame = overrides.get("frames", {}).get(r["id"])
-        est = frame is None
+        est = frame is None or r["id"] in overrides.get("estimated", [])  # 콘솔이 넘긴 추정값도 노란색
         frame = estimate(r["feat"]) if est else int(frame)
         est_rows += est
-        ws.append([r["id"], None, "\n".join(r["cam"]), r["same"], f"=ROUND(F{i}/{FPS},1)", frame, START, f"=G{i}+F{i}-1",
+        start = int(overrides.get("starts", {}).get(r["id"], START))
+        ws.append([r["id"], None, "\n".join(r["cam"]), r["same"], f"=ROUND(F{i}/{overrides.get('fps', FPS)},1)", f"=H{i}-G{i}+1", start, start + frame - 1,
                    "\n".join(r["bg"]), "\n".join(r["ch"]), "\n".join(r["pr"]), r["count"], r["dialogue"], r["description"]])
         if est:
-            ws.cell(i, 6).fill = YELLOW
+            ws.cell(i, 8).fill = YELLOW
         ws.row_dimensions[i].height = 64.5
         for col in range(1, len(heads) + 1):
             ws.cell(i, col).alignment = Alignment(wrap_text=True, vertical="center")
@@ -175,7 +222,7 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
         elif r["id"].endswith("b") and (thumbs / ("C%02dB.png" % r["cut"])).exists():
             name = "C%02dB" % r["cut"]
         if name and (thumbs / f"{name}.png").exists():
-            im = XlImage(str(thumbs / f"{name}.png"))
+            im = XlImage(shrink((thumbs / f"{name}.png").read_bytes(), 240))  # 셀에는 114x64로 보이므로 240px JPEG면 충분하고, 시트가 커넥터 한도 안에 든다
             im.width, im.height = 114, 64
             ws.add_image(im, f"B{i}")
     # 드롭다운
@@ -188,14 +235,7 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
     for k, v in widths.items():
         ws.column_dimensions[k].width = v
     ws.freeze_panes = "C2"
-    # Asset 시트(게이트 2에서 확정한 목록)
-    wa = wb.create_sheet("Asset")
-    wa.append(["Asset Name(국문)", "Asset Code(영문)", "분류"])
-    for cat, items in load_assets(asset_xlsx).items():
-        for n, code in items.items():
-            wa.append([n, code, cat])
-    for c in wa[1]:
-        c.fill, c.font = GRAY, Font(name="Arial", bold=True)
+    copy_asset_sheet(asset_xlsx, wb)
     # 요약 탭: 고정 입력(방영 길이, 목표 행 수), 합계 검증, 작업자별 집계
     sm = wb.create_sheet("요약")
     n_cuts = len(parsed["cuts"])

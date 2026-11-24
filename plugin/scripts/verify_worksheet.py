@@ -14,16 +14,22 @@ def verify(path, summary=None):
     while ws.cell(last, 1).value in (None, "") or not re.match(r"C\d+", str(ws.cell(last, 1).value)):
         last -= 1
     ids = [str(ws.cell(r, 1).value) for r in range(2, last + 1)]
-    codes = {str(r[1].value) for r in wb["Asset"].iter_rows(min_row=2) if r[1].value}
+    codes = {str(r[1].value).strip() for r in wb["Asset"].iter_rows(min_row=2) if r[1].value}  # EP12 Asset 탭에는 " LoopyHanky"처럼 앞 공백이 든 코드가 있다
     res = []
     add = lambda name, ok, detail="": res.append((name, bool(ok), detail))
 
+    head = [wb["Asset"].cell(2, c).value for c in range(1, 10)]
+    add("Asset 탭이 EP12 형식(머리글 9열)", head == ["Asset Name(국문)", "Asset Code(영문)", "경로", "제작자", "설명", "렌더 이미지", "비고", "디자인 필요 여부", "리깅"], str(head))
     add("행 ID 중복 없음", len(ids) == len(set(ids)), f"{len(ids)}행")
     add("컷 번호 연속(C001~)", sorted({int(re.match(r"C(\d+)", i).group(1)) for i in ids}) == list(range(1, max(int(re.match(r"C(\d+)", i).group(1)) for i in ids) + 1)))
-    bad = [r for r in range(2, last + 1) if not (isinstance(ws.cell(r, 6).value, int) and ws.cell(r, 6).value > 0)]
-    add("Frame이 모두 양의 정수", not bad, f"문제 행 {bad[:5]}")
-    add("Sec 수식이 29.97", all(ws.cell(r, 5).value == f"=ROUND(F{r}/29.97,1)" for r in range(2, last + 1)))
-    add("Start=101, End=Start+Frame-1", all(ws.cell(r, 7).value == 101 and ws.cell(r, 8).value == f"=G{r}+F{r}-1" for r in range(2, last + 1)))
+    # EP12 시트와 같이 Start·End는 값, Frame = End - Start + 1, Sec = ROUND(Frame/FPS,1). FPS는 첫 행 수식에서 읽는다
+    frame = lambda r: ws.cell(r, 8).value - ws.cell(r, 7).value + 1
+    bad = [r for r in range(2, last + 1) if not all(isinstance(ws.cell(r, c).value, (int, float)) and float(ws.cell(r, c).value).is_integer() for c in (7, 8)) or frame(r) <= 0]
+    add("Start·End Frame이 정수이고 Frame이 양수", not bad, f"문제 행 {bad[:5]}")
+    add("Frame = End - Start + 1", all(ws.cell(r, 6).value == f"=H{r}-G{r}+1" for r in range(2, last + 1)))
+    m = re.fullmatch(r"=ROUND\(F2/([\d.]+),1\)", str(ws.cell(2, 5).value))
+    fps = float(m.group(1)) if m else None
+    add("Sec 수식이 모든 행에서 같은 FPS", fps and all(ws.cell(r, 5).value == f"=ROUND(F{r}/{m.group(1)},1)" for r in range(2, last + 1)), f"FPS {fps}")
     unknown = set()
     for r in range(2, last + 1):
         for c in (9, 10, 11):
@@ -51,7 +57,7 @@ def verify(path, summary=None):
     firsts = [r for r in range(2, last + 1) if re.fullmatch(r"C\d+", ids[r - 2])]
     imgs = {im.anchor._from.row + 1 for im in ws._images}
     add("컷마다 썸네일이 있음", set(firsts) <= imgs, f"썸네일 {len(imgs)}개, 없는 행 {sorted(set(firsts) - imgs)[:5]}")
-    yellow = sum(1 for r in range(2, last + 1) if ws.cell(r, 6).fill.fgColor.rgb.endswith("FFF2CC"))
+    yellow = sum(1 for r in range(2, last + 1) if ws.cell(r, 8).fill.fgColor.rgb.endswith("FFF2CC"))  # 추정 Frame은 End Frame 칸에 노란색
     if summary:
         s = json.loads(pathlib.Path(summary).read_text(encoding="utf-8"))
         add("노란색 Frame 행 수 = 요약값", yellow == s["estimated_frame_rows"], f"{yellow}")
@@ -59,7 +65,7 @@ def verify(path, summary=None):
         if s.get("target_cuts") is not None:
             add("시나리오 컷 수 = 목표 컷 수", s["cuts"] == s["target_cuts"], f"{s['cuts']} / 목표 {s['target_cuts']}")
         if s.get("runtime_min") is not None:
-            sec = sum(round(ws.cell(r, 6).value / 29.97, 1) for r in range(2, last + 1))
+            sec = sum(round(frame(r) / fps, 1) for r in range(2, last + 1)) if fps else 0
             mins = round(sec / 60, 2)
             add("총 러닝타임이 방영 길이 허용 오차 안", abs(mins - s["runtime_min"]) <= s["tol_min"], f"{mins}분 / 방영 {s['runtime_min']}분, 허용 {s['tol_min']}분")
     return res
