@@ -7,7 +7,8 @@
 - 방영 길이(분)와 목표 컷 수(EP12는 166)는 시나리오와 함께 받는 고정 입력이다. 행 수(분할 포함)는 PD가 썸네일을 보고 분할을 정해야 확정되는 결과라 입력이 아니다. 요약 탭이 총 러닝타임과 컷 수를 이 값과 견준다.
 - 공정 열(LO·AN·Render·Comp)은 드롭다운만 만들고 작업자는 비워 둔다.
 사용: python -I build_worksheet.py <docx> <thumbs_dir> <asset_xlsx> <out.xlsx> [--ep 12] [--overrides o.json] [--fit golden.xlsx] [--runtime-min 10] [--target-cuts 166] [--tol-min 0.5]
-overrides.json: {"splits": {"11": 2}, "frames": {"C001": 120}, "workers": {...}}  (게이트 1·2에서 PD가 정한 값)
+overrides.json: {"splits": {"11": 2}, "frames": {"C001": 120}, "workers": {...}, "lists": {"an": ["송민주", ...]}}  (게이트 1·2에서 PD가 정한 값)
+  lists: 작업현황 드롭다운 목록(status·rstatus·ver·an·render·comp). 콘솔의 '작업현황 드롭다운 목록'에서 PD가 고친 값이고, 없는 키는 LISTS 기본값을 쓴다. cam(Cam Move)은 콘솔 선택지용이라 시트에 드롭다운을 걸지 않는다(한 칸에 여러 값).
 """
 import re, sys, os, json, argparse, pathlib
 import numpy as np
@@ -38,12 +39,22 @@ FIXED = ["", "Thumbnail", "Cam\nMove", "Same\nCamera", "Sec", "Frame", "Start\nF
 PROC = [("LO", "status"), ("작업자", "an"), ("요청사항", None)]
 for k in range(1, 5):
     PROC += [(f"AN TK0{k}", "status"), ("작업자", "an"), ("요청사항", None)]
-PROC += [("AN 완료", "ver"), ("Render TK01", "rstatus"), ("작업자", "render"), ("요청사항", None)]
-for k in range(2, 5):
-    PROC += [(f"Render TK0{k}", "rstatus"), ("요청사항", None)]
+PROC += [("AN 완료", "ver"), ("Render TK01", "status"), ("작업자", "render"), ("요청사항", None)]
+for k in range(2, 5):  # EP12 시트: Render TK01·TK02는 LO·AN 상태 목록, TK03부터 Render·Comp 상태 목록
+    PROC += [(f"Render TK0{k}", "status" if k == 2 else "rstatus"), ("요청사항", None)]
 for k in range(1, 6):
     PROC += [(f"Comp TK0{k}", "rstatus"), ("작업자", "comp")]
 LISTS = {"status": STATUS, "rstatus": RSTATUS, "ver": VERS, "an": WORKERS["an"], "render": WORKERS["render"], "comp": WORKERS["comp"]}
+
+
+def picklists(overrides):
+    """기본 목록에 PD가 고친 목록을 덮는다. 엑셀 목록 드롭다운은 '항목,항목' 문자열이 255자를 넘거나 항목에 쉼표가 있으면 깨진다."""
+    lists = {**LISTS, **overrides.get("lists", {})}
+    for k, v in lists.items():
+        s = ",".join(v)
+        if not v or any("," in x for x in v) or len(s) > 255:
+            raise ValueError(f"드롭다운 목록 {k}: 비어 있거나 쉼표가 들었거나 255자를 넘습니다 ({s[:40]})")
+    return lists
 
 
 def ranges(nums):
@@ -134,6 +145,7 @@ def estimate(feat):
 
 def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, target_cuts=None, tol_min=0.5):
     parsed, rows, unknown = derive(docx_path, asset_xlsx, overrides)
+    lists = picklists(overrides)
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = f"EP{ep}"
@@ -169,7 +181,7 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
     # 드롭다운
     for idx, (_, kind) in enumerate(PROC, start=len(FIXED) + 1):
         if kind:
-            dv = DataValidation(type="list", formula1='"%s"' % ",".join(LISTS[kind]), allow_blank=True)
+            dv = DataValidation(type="list", formula1='"%s"' % ",".join(lists[kind]), allow_blank=True)
             ws.add_data_validation(dv)
             dv.add(f"{L(idx)}2:{L(idx)}{last}")
     widths = {"A": 9, "B": 17, "C": 8, "D": 8, "E": 6, "F": 8, "G": 8, "H": 9, "I": 20, "J": 30, "K": 22, "L": 9, "M": 40, "N": 42}
@@ -207,8 +219,8 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
     sm.append([]); sm.append(["작업자", "맡은 칸 수", "러닝타임(초)"])
     head_row = sm.max_row
     wcols = {k: [L(i) for i, (h, kind) in enumerate(PROC, start=len(FIXED) + 1) if h == "작업자" and kind == k] for k in WORKERS}
-    for kind, names in WORKERS.items():
-        for n in names:
+    for kind in WORKERS:
+        for n in lists[kind]:
             cnt = "+".join(f'COUNTIF({q}!{c}2:{c}{last},"{n}")' for c in wcols[kind])
             sec = "+".join(f'SUMIF({q}!{c}2:{c}{last},"{n}",{q}!E2:E{last})' for c in wcols[kind])
             sm.append([n, "=" + cnt, "=ROUND(" + sec + ",1)"])
