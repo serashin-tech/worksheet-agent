@@ -300,6 +300,20 @@ a.link { color: var(--accent); font-weight: 700; overflow-wrap: anywhere; }
 <div class="bar" id="bar" hidden><div class="wrap"><p id="barMsg"></p><button class="btn primary" id="barBtn"></button></div></div>
 
 <script>
+/* 로컬 사이트 모드(Codex 등 claude.ai 밖): serve_console.py가 같은 커넥터 호출을 PC 폴더로 처리한다. 폴더 자리에는 Drive 링크 대신 PC 경로를 쓴다 */
+const LOCAL = !window.claude && typeof location !== "undefined" && /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
+if (LOCAL) window.claude = { use: async (n) => n !== "mcp" ? null : {
+  listTools: async () => ({}),
+  callTool: async (server, tool, input) => {
+    const r = await fetch("/mcp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ server, tool, input }) });
+    const j = await r.json().catch(() => ({ code: "tool_error", message: "로컬 서버 응답을 읽지 못했습니다." }));
+    if (!r.ok) throw { code: j.code || "tool_error", message: j.message };
+    return { payload: j };
+  } } };
+const lid = (p) => "L" + btoa(String.fromCharCode(...new TextEncoder().encode(p.replace(/\\/g, "/").replace(/\/+$/, "")))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const folderMatch = (v) => v.match(/folders\/([\w-]{10,})/) || v.trim().match(/^([\w-]{20,})$/) || (LOCAL && /^([A-Za-z]:[\\/]|\/)/.test(v.trim()) ? [v, lid(v.trim())] : null);
+const LINK_MSG = LOCAL ? "PC 폴더 경로(예: G:\\내 드라이브\\작업)를 붙여 넣어 주세요." : "Drive 폴더 링크(…/folders/…)를 붙여 넣어 주세요.";
+const LINK_PH = LOCAL ? "G:\\내 드라이브\\…" : "https://drive.google.com/drive/folders/…";
 const SHEET_URL = "https://docs.google.com/spreadsheets/d/1AYqLq2Fn7e3cWHoiK9-3avHFXdn2UIZuVdQ2iPOo7Nw/edit";
 let T = {}, P = {}, PO = [], PT = {}; // PT: 스토리보드 칸마다 OCR로 읽은 DIALOGUE·NOTE(storyboard_text.py)
 const sbText = (id, i) => (PT[id] && PT[id][i]) || { dia: "", note: "" };
@@ -447,16 +461,16 @@ function initShots2() {
 }
 const emptyShots = () => Object.values(S.sa || {}).filter((v) => !v.bg.length && !v.ch.length && !v.pr.length);
 async function scanFolder(kind, input, btn) {
-  const m = input.value.match(/folders\/([\w-]{10,})/) || input.value.trim().match(/^([\w-]{20,})$/);
+  const m = folderMatch(input.value);
   const st = (S.folders[kind + "Msg"] = {}); const done = (msg, fail) => { st.busy = false; st.msg = msg; if (fail) delete S.folders[kind]; go(S.tab); };
-  if (!m) return done("Drive 폴더 링크(…/folders/…)를 붙여 넣어 주세요.", true);
+  if (!m) return done(LINK_MSG, true);
   const id = m[1]; st.busy = true; if (kind === "series") LS.set("wsSeriesFolder", input.value.trim()); go(S.tab);
   try {
     const mcp = window.claude && (await window.claude.use("mcp")); if (!mcp) throw { code: "capability_disabled" };
     const list = async (q) => { let out = [], tok; for (let i = 0; i < 5; i++) { const r = await mcp.callTool("Google Drive", "search_files", { query: q, pageSize: 200, excludeContentSnippets: true, ...(tok ? { pageToken: tok } : {}) }, { cache: false }); const p = r.payload || {}; out = out.concat(p.files || []); tok = p.nextPageToken; if (!tok) break; } return out; };
     const [dirs, files] = await Promise.all([list(`'${id}' in ancestors and mimeType = 'application/vnd.google-apps.folder' and trashed = false`), list(`'${id}' in ancestors and mimeType != 'application/vnd.google-apps.folder' and trashed = false`)]);
     const title = Object.fromEntries(dirs.map((d) => [d.id, d])); const pathOf = (f) => { const parts = [f.title]; let pid = f.parentId; while (pid && title[pid]) { parts.unshift(title[pid].title); pid = title[pid].parentId; } return parts.join("/"); };
-    S.folders[kind] = { files: files.map((f) => ({ folder: kind, path: pathOf(f), id: f.id })) }; // id: 플러그인이 렌더 이미지를 내려받을 Drive 파일 initShots2(); done(`파일 ${files.length}개를 읽었습니다.`);
+    S.folders[kind] = { files: files.map((f) => ({ folder: kind, path: pathOf(f), id: f.id })) }; /* id: 플러그인이 렌더 이미지를 내려받을 Drive 파일 */ initShots2(); done(`파일 ${files.length}개를 읽었습니다.`);
   } catch (e) {
     done(e && e.code === "not_in_manifest" ? "이 페이지에서 Google Drive 사용을 허용하지 않았습니다." : e && e.code === "server_not_connected" ? "Google Drive 커넥터가 연결되어 있지 않습니다." : e && e.code === "needs_reauth" ? "Google Drive 연결이 만료되었습니다. 커넥터에서 다시 연결해 주세요." : "폴더를 읽지 못했습니다" + (e && e.message ? ": " + e.message : "") + ".", true);
   }
@@ -464,7 +478,7 @@ async function scanFolder(kind, input, btn) {
 function folderCard() {
   const fa = folderAssets(), cnt = (k) => Object.keys(fa.assets[k]).length, f = S.folders.series, m = S.folders.seriesMsg;
   const busy = !!(m && m.busy), ok = !!f && !busy, state = busy ? "busy" : ok ? "ok" : m && m.msg ? "bad" : "wait";
-  const inp = h("input", { type: "text", id: "fd_series", placeholder: "https://drive.google.com/drive/folders/…", autocomplete: "off", required: true, "aria-required": "true", "aria-label": "시리즈 에셋 폴더 연결", style: "flex:1;min-width:0;min-height:40px;font-size:14px;padding:8px 12px", value: S.folders.seriesUrl || "", oninput: (e) => { S.folders.seriesUrl = e.target.value; }, onkeydown: (e) => { if (e.key === "Enter") scanFolder("series", inp, btn); } });
+  const inp = h("input", { type: "text", id: "fd_series", placeholder: LINK_PH, autocomplete: "off", required: true, "aria-required": "true", "aria-label": "시리즈 에셋 폴더 연결", style: "flex:1;min-width:0;min-height:40px;font-size:14px;padding:8px 12px", value: S.folders.seriesUrl || "", oninput: (e) => { S.folders.seriesUrl = e.target.value; }, onkeydown: (e) => { if (e.key === "Enter") scanFolder("series", inp, btn); } });
   const btn = h("button", { class: "btn primary", style: "min-height:40px", disabled: busy, onclick: () => scanFolder("series", inp, btn) }, "폴더 확인");
   const badge = h("span", { class: "st " + state, role: "status" }, busy ? "확인 중" : ok ? "읽을 수 있음" : state === "bad" ? "실패" : "확인 전");
   const s = (v, l) => h("div", {}, h("b", {}, v), h("span", {}, l));
@@ -522,9 +536,30 @@ function scenarioFields(lines, fname) {
   return got;
 }
 // SCENARIO-PARSE-END
+/* 로컬 사이트: 올린 파일 하나로 그 단계의 데이터를 서버가 만든다(시나리오 → 컷 목록, 스토리보드 → 썸네일·칸·OCR 글) */
+async function genData(kind, file) {
+  const r = await fetch("/gen", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, name: file.name, base64: await b64(file) }) });
+  const j = await r.json().catch(() => ({ message: "서버 응답을 읽지 못했습니다." }));
+  if (!r.ok) throw new Error(j.message || "데이터를 만들지 못했습니다.");
+  return j;
+}
+async function readStoryboard(file) {
+  const f = S.files.pdf; f.reading = true; f.msg = ""; renderG1();
+  try {
+    const g = await genData("storyboard", file);
+    T = g.thumbs; P = g.panels.panels; PO = g.panels.order; PT = g.panels.text || {};
+    S.D.cuts.forEach((c) => { c.thumb = !!T[c.id]; });
+  } catch (e) { f.msg = "스토리보드를 읽지 못했습니다: " + e.message; }
+  f.reading = false; if (S.tab === 1) renderG1(); renderSteps();
+}
 async function readScenario(file) {
   const D = S.D; S.files.docx.reading = true; renderUpload();
   try {
+    if (LOCAL) { // 컷 목록은 이 시나리오에서 만든다. 스토리보드를 이미 읽었으면 썸네일 표시를 다시 맞춘다
+      const g = await genData("scenario", file);
+      g.cuts.forEach((c) => { c.reviewed = false; c.fc = false; c.chOk = false; c.thumb = !!T[c.id]; });
+      D.cuts = g.cuts; D.baseFrame = g.baseFrame; D.unknown = g.unknown || [];
+    }
     const got = scenarioFields(await scenarioLines(file.name, await file.arrayBuffer()), file.name);
     ["series", "ep", "etitle", "runtime", "target"].forEach((k) => { if (got[k]) { D[k] = got[k][0]; S.src[k] = got[k][1]; } else S.src[k] = "직접 입력"; });
     if (got.series) LS.set("wsSeries", D.series);
@@ -580,13 +615,15 @@ function pdfCard() {
   const f = S.files, has = !!f.pdf, n = S.D.cuts.length;
   return h("div", { class: "grid2", style: "margin-bottom:12px" },
     h("div", { class: "card stack" }, h("h2", {}, "스토리보드"),
-      dropBox("pdf", "스토리보드(.pdf)", ".pdf", "", () => { go(1); saveInput("pdf"); }),
-      has ? h("div", { class: "stats", id: "stats1", style: "padding:0" }) : null),
+      dropBox("pdf", "스토리보드(.pdf)", ".pdf", "", (x) => { go(1); saveInput("pdf"); if (LOCAL) readStoryboard(x); }),
+      has && f.pdf.reading ? h("p", { class: "muted", role: "status" }, "스토리보드를 읽는 중입니다. 칸을 나누고 글자를 읽느라 1~2분 걸립니다.") : null,
+      has && f.pdf.msg ? h("div", { class: "note", role: "status" }, f.pdf.msg) : null,
+      has && !f.pdf.reading ? h("div", { class: "stats", id: "stats1", style: "padding:0" }) : null),
     h("div", { class: "card stack" }, h("h2", {}, "올리면 확인하는 것"), h("ul", { class: "checks" },
-      [["시나리오와 스토리보드 컷 대조", has ? "pass" : "wait", has ? sbMsg() : "두 자료를 비교해 컷을 대조합니다"],
+      [["시나리오와 스토리보드 컷 대조", has && !f.pdf.reading ? "pass" : "wait", has && !f.pdf.reading ? sbMsg() : "두 자료를 비교해 컷을 대조합니다"],
        saveCheck("docx", "시나리오 Drive 저장"), saveCheck("pdf", "스토리보드 Drive 저장")]
         .map(([t, c, d]) => h("li", {}, h("span", { class: "tag " + c }, c === "pass" ? "통과" : c === "warn" ? "확인" : "대기"), h("span", {}, h("b", {}, t), " ", d)))),
-      h("div", { class: "row" }, h("button", { class: "btn primary", disabled: !has, id: "toG2", onclick: () => { S.g1 = true; go(2); } }, "스토리보드 확인하고 에셋으로"))));
+      h("div", { class: "row" }, h("button", { class: "btn primary", disabled: !has || !!f.pdf.reading, id: "toG2", onclick: () => { S.g1 = true; go(2); } }, "스토리보드 확인하고 에셋으로"))));
 }
 /* 스토리보드(2-1): PDF와 같은 컬럼(CUT, PICTURE, DIALOGUE, NOTE, TIME)으로 칸을 모두 보여 줌. CUT 안의 칸은 a, b, c로 부름 */
 const SB_META = { ratio: "16:9", res: "1920*1080", fps: "24FPS" }; // EP12 스토리보드 PDF 쪽 머리글에 적힌 값
@@ -599,8 +636,8 @@ const panelName = (g, i) => g.id + (g.n > 1 ? "abcdefghij"[i] : "");
 function renderG1() {
   setBar(null); const p = $("#p1"); p.replaceChildren();
   p.append(pdfCard());
-  if (!S.files.pdf) {
-    p.append(h("p", { class: "muted measure" }, "스토리보드(.pdf)를 올리면 컷마다 SHOT을 PDF와 같은 순서로 보여 줍니다."));
+  if (!S.files.pdf || S.files.pdf.reading) {
+    if (!S.files.pdf) p.append(h("p", { class: "muted measure" }, "스토리보드(.pdf)를 올리면 컷마다 SHOT을 PDF와 같은 순서로 보여 줍니다."));
     return;
   }
   p.append(h("div", { class: "filters", id: "fl1", role: "group", "aria-label": "보기" }),
@@ -993,9 +1030,9 @@ S.folders.seriesUrl = LS.get("wsSeriesFolder") || ""; // 시리즈 에셋 폴더
 const rootLabel = () => (S.root.ok ? "지정한 작업 폴더/" : "작업 폴더 지정 전/");
 const connOk = () => Object.values(S.conn).every((v) => v && v.ok) && S.root.ok;
 async function checkRoot(inp) {
-  const m = inp.value.match(/folders\/([\w-]{10,})/) || inp.value.trim().match(/^([\w-]{20,})$/);
+  const m = folderMatch(inp.value);
   S.root = { url: inp.value.trim(), ok: false, msg: "", busy: true }; if (m) LS.set("wsRoot", S.root.url);
-  if (!m) { S.root = { url: inp.value.trim(), ok: false, msg: "Drive 폴더 링크(…/folders/…)를 붙여 넣어 주세요." }; return renderSetup(); }
+  if (!m) { S.root = { url: inp.value.trim(), ok: false, msg: LINK_MSG }; return renderSetup(); }
   renderSetup();
   try {
     const mcp = window.claude && (await window.claude.use("mcp")); if (!mcp) throw { code: "capability_disabled" };
@@ -1005,10 +1042,10 @@ async function checkRoot(inp) {
   renderSetup(); if (S.tab === 0 || S.tab === 4) go(S.tab);
 }
 /* 작업 폴더 저장: <작업 폴더>/<애니메이션명>/EP##/00_입력·01_산출·02_작업. 있는 폴더는 그대로 쓰고 없는 폴더만 만든다 */
-const FOLDER_MT = "application/vnd.google-apps.folder", MAX_UP = 7 * 1024 * 1024; // Drive 커넥터 요청 본문이 10MB(base64 포함)까지라 약 7MB 파일까지 올라간다(PLAN Phase 0)
+const FOLDER_MT = "application/vnd.google-apps.folder", MAX_UP = LOCAL ? Infinity : 7 * 1024 * 1024; // Drive 커넥터 요청 본문이 10MB(base64 포함)까지라 약 7MB 파일까지 올라간다(PLAN Phase 0)
 const qs = (v) => String(v).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 const epName = () => "EP" + String(S.D.ep).padStart(2, "0");
-const folderUrl = (id) => "https://drive.google.com/drive/folders/" + id;
+const folderUrl = (id) => (LOCAL ? "/open?id=" : "https://drive.google.com/drive/folders/") + id; // 로컬: 서버가 탐색기로 연다
 async function useMcp() { const m = window.claude && (await window.claude.use("mcp")); if (!m) throw { code: "capability_disabled" }; return m; }
 async function ensureFolder(mcp, parentId, name) {
   const r = await mcp.callTool("Google Drive", "search_files", { query: `parentId = '${qs(parentId)}' and title = '${qs(name)}' and mimeType = '${FOLDER_MT}' and trashed = false`, pageSize: 1, excludeContentSnippets: true }, { cache: false });
@@ -1034,8 +1071,8 @@ async function saveInput(kind) {
   f.save = { st: "busy" }; repaintSave();
   try {
     const F = await epFolders(), x = f.file, mt = x.type || "application/octet-stream";
-    const t = x.size > MAX_UP ? {} : await F.mcp.listTools().catch(() => ({}));
-    const content = x.size > MAX_UP ? null : t.fileArgs ? { $file: { data: x, name: x.name, type: mt } } : x.size < 700000 ? await b64(x) : null;
+    const t = x.size > MAX_UP || LOCAL ? {} : await F.mcp.listTools().catch(() => ({}));
+    const content = x.size > MAX_UP ? null : t.fileArgs ? { $file: { data: x, name: x.name, type: mt } } : x.size < 700000 || LOCAL ? await b64(x) : null; // 로컬 서버는 요청 크기 제한이 없다
     if (!content) f.save = { st: "big", url: folderUrl(F.inp) };
     else {
       const r = await F.mcp.callTool("Google Drive", "create_file", { title: x.name, parentId: F.inp, contentMimeType: mt, base64Content: content, disableConversionToGoogleType: true }, { cache: false });
@@ -1118,14 +1155,14 @@ function renderSetup() {
   if (ok && !S.setupOk) { box.hidden = true; btn.setAttribute("aria-expanded", "false"); } // 커넥터 두 개와 작업 폴더가 모두 확인(승인)되는 순간 설정 섹션을 닫는다
   S.setupOk = ok;
   const rs = S.root, rstate = rs.busy ? "busy" : rs.ok ? "ok" : rs.msg ? "bad" : "wait";
-  const inp = h("input", { type: "text", placeholder: "https://drive.google.com/drive/folders/…", autocomplete: "off", "aria-label": "회사 작업 폴더 링크", value: rs.url, oninput: (e) => { S.root.url = e.target.value; }, onkeydown: (e) => { if (e.key === "Enter") checkRoot(inp); } });
+  const inp = h("input", { type: "text", placeholder: LINK_PH, autocomplete: "off", "aria-label": "회사 작업 폴더 링크", value: rs.url, oninput: (e) => { S.root.url = e.target.value; }, onkeydown: (e) => { if (e.key === "Enter") checkRoot(inp); } });
   const step = (n, title, ...body) => h("li", { class: "step" }, h("span", { class: "num", "aria-hidden": "true" }, String(n)), h("div", { class: "stack", style: "gap:8px" }, h("b", {}, title), ...body));
   const hint = (t) => h("div", { class: "muted", style: "font-size:13px" }, t);
   box.replaceChildren(
     h("div", { class: "row", style: "justify-content:space-between" }, h("h2", { style: "margin:0" }, "Google Drive 연결 설정"), h("button", { class: "btn", onclick: () => { box.hidden = true; btn.setAttribute("aria-expanded", "false"); } }, "닫기")),
     h("p", { class: "muted measure", style: "margin:0" }, "시나리오를 올리기 전에 한 번 설정합니다. 설정하지 않으면 입력 자료와 시트를 저장할 수 없습니다."),
     h("ol", { class: "steps" },
-      step(1, "커넥터 연결", hint("claude.ai 설정의 커넥터에서 Google Drive와 Google Sheets를 추가한 뒤 확인합니다."),
+      step(1, "커넥터 연결", hint(LOCAL ? "로컬 콘솔은 커넥터 대신 PC 폴더를 씁니다. 연결 확인만 누르면 됩니다." : "claude.ai 설정의 커넥터에서 Google Drive와 Google Sheets를 추가한 뒤 확인합니다."),
         h("div", { class: "chk", style: "gap:10px 24px" }, Object.keys(CONN).map((n) => { const s = S.conn[n]; return h("span", { class: "chk" }, h("button", { class: "btn primary", disabled: !!(s && s.busy), onclick: () => checkConn(n) }, n + " 연결 확인"), badge(stKey(s))); })),
         ...Object.keys(CONN).map((n) => (S.conn[n] && S.conn[n].msg ? h("div", { class: "note", role: "status" }, S.conn[n].msg) : null))),
       step(2, "회사 작업 폴더 연결",hint("작업 폴더 아래 애니메이션명 / 에피소드 번호 폴더에 00_입력(시나리오·스토리보드), 01_산출(시트), 02_작업(작업 기록)을 두고 결과물을 저장합니다. 폴더가 없으면 새로 만들고, 있으면 그대로 씁니다."),
@@ -1133,7 +1170,11 @@ function renderSetup() {
         rs.msg ? h("div", { class: "note", role: "status" }, rs.msg) : null),
       step(3, "화면 승인", hint("처음 확인하면 승인 창이 열립니다. 승인해야 폴더와 시트를 읽고 저장할 수 있습니다."))));
 }
-Promise.all([fetch("cuts.json").then((r) => r.json()), fetch("thumbs.json").then((r) => r.json()), fetch("work.json").then((r) => r.json()), fetch("panels.json").then((r) => r.json())]).then(([D, th, W, pj]) => {
+const getJ = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+Promise.all(["cuts.json", "thumbs.json", "work.json", "panels.json"].map(getJ)).then(([D, th, W, pj]) => {
+  if (!D && !LOCAL) throw new Error("no demo data");
+  // 로컬: 시연 데이터가 없으면 빈 상태로 시작하고, 시나리오·스토리보드를 올릴 때 서버(/gen)가 만든 값을 읽는다
+  D = D || { ep: "", cuts: [], assets: {}, unknown: [] }; th = th || {}; W = W || { ids: [], takes: [], cells: {} }; pj = pj || { order: [], panels: {}, text: {} };
   T = th; P = pj.panels; PO = pj.order; PT = pj.text || {}; S.W = W; S.Wdemo = W; S.title = LS.get("wsTitle") || ""; S.folders.seriesUrl = LS.get("wsSeriesFolder") || ""; // 한 번 확인한 시리즈 에셋 폴더 링크는 다음에 열 때 채워 둔다
   D.cuts.forEach((c) => { c.reviewed = false; c.fc = false; c.chOk = false; });
   D.series = ""; D.ep = ""; S.D = D; renderTitle(false); go(0); // 시나리오를 올리기 전에는 애니메이션명·에피소드 번호를 비워 두고 placeholder만 보인다

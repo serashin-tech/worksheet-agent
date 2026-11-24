@@ -1,6 +1,6 @@
 ---
 name: worksheet-build
-description: 콘솔에서 확정한 에피소드의 Worksheet xlsx를 만들어 작업 폴더의 01_산출에 Google Sheet로 올린다. PD가 "시트 만들어 줘", "워크시트 올려 줘", "01_산출에 넣어 줘"라고 하거나, 콘솔이 02_작업에 cuts.json을 남긴 뒤 시트를 만들 때 쓴다.
+description: 콘솔에서 확정한 에피소드의 Worksheet xlsx를 만들어 작업 폴더의 01_산출에 Google Sheet로 올린다. PD가 "시트 만들어 줘", "워크시트 올려 줘", "01_산출에 넣어 줘"라고 하거나, 콘솔이 02_작업에 cuts.json을 남긴 뒤 시트를 만들 때 쓴다. Google Drive 커넥터가 없으면(Codex 등) 로컬 모드로 PC 작업 폴더에서 만든다.
 ---
 
 # Worksheet 만들기와 01_산출 업로드
@@ -53,6 +53,23 @@ python -I verify_worksheet.py <out.xlsx> <out.summary.json>
    - `base64Content`: `sha256:<해시>:<out.xlsx 절대 경로, 폴더 구분은 />`
    - `disableConversionToGoogleType`는 넣지 않는다. Google Sheet로 변환되어야 콘솔 작업현황이 읽는다.
 4. 돌려받은 `viewUrl`을 PD에게 준다. 콘솔 작업현황의 "작업 폴더에서 찾기"를 누르면 이 시트가 목록에 나온다.
+
+## 로컬 모드(Google Drive 커넥터가 없을 때)
+
+Codex처럼 커넥터가 없거나 꺼진 곳에서는 콘솔을 `worksheet-console` 스킬로 띄워 쓴다. 이때 작업 폴더는 PC 경로이고, 1·2·4절의 커넥터 호출 대신 파일을 직접 다룬다. 3절(조립과 검증)은 같다.
+
+1. PD에게 작업 폴더 경로와 애니메이션명·에피소드 번호를 받는다. 에피소드 폴더는 `<작업 폴더>\<애니메이션명>\EP12\`다.
+2. `02_작업\cuts.json`, `00_입력`의 시나리오와 스토리보드를 그 자리에서 읽는다. 내려받기와 7MB 한도는 없다.
+3. 렌더 이미지는 이렇게 모은다. 콘솔이 에셋 파일의 PC 경로를 `fileId`에 넣어 두었다.
+   ```
+   python -I serve_console.py --export-images <cuts.json> <aimg폴더>
+   ```
+4. 3절대로 조립하고 검증한다.
+5. 완성한 xlsx를 `01_산출`에 넣는다. 이름 짓기(`title`_날짜, 같은 이름이 있으면 시각을 붙임)와 복사는 스크립트가 한다. `cuts.json`은 UTF-8이라 직접 읽으면 Windows 기본 인코딩 때문에 한글 제목이 깨지므로, 제목을 직접 읽어 이름을 만들지 않는다. 출력된 경로를 PD에게 준다.
+   ```
+   python -I serve_console.py --publish <cuts.json> <out.xlsx> <01_산출폴더>
+   ```
+6. 작업 폴더가 Drive 동기화 폴더 안이면 파일이 Drive에 올라가지만, Google Sheet로 바뀌지는 않는다. PD가 Google Sheet가 필요하면 Drive에서 열어 "Google Sheets로 저장"을 하게 알린다. 로컬 콘솔의 작업 현황은 xlsx를 그대로 읽는다.
 
 ## 아직 넘기지 않는 값
 

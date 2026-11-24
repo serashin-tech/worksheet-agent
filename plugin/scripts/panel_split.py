@@ -72,7 +72,7 @@ def main():
             crop = gray[p["y0"] + 4:p["y1"] - 4, int(w * PIC_X[0]) + 4:int(w * PIC_X[1]) - 4]
             Image.fromarray(crop).save(out_dir / f"p{pn + 1:02d}_{i + 1}.png")
         report.append({"page": pn + 1, "panels": panels})
-    (out_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1))
+    (out_dir / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
     n_pan = sum(len(r["panels"]) for r in report)
     n_cut = sum(p["cut_start"] for r in report for p in r["panels"])
     print(f"pages={len(report)} panels={n_pan} cut_starts={n_cut}")

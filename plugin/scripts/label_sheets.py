@@ -35,7 +35,7 @@ def main(pdf, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
     slots = label_slots(pymupdf.open(pdf))
     meta = [{k: v for k, v in s.items() if k != "crop"} for s in slots]
-    (out_dir / "slots.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1))
+    (out_dir / "slots.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
     tw, th = (slots[0]["crop"].shape[1]) * SCALE, (slots[0]["crop"].shape[0]) * SCALE
     cap = 22
     per = COLS * ROWS
