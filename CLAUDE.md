@@ -12,7 +12,7 @@
 ## 구조
 
 - `plugin/scripts/`: 결정적 코드. 대본 파싱(`parse_docx.py`), 콘티 칸 분할(`panel_split.py`), 썸네일, 에셋 도출(`extract_assets.py`, `folder_assets.py`), 시트 조립(`build_worksheet.py`), 검증(`verify_worksheet.py`), 평가(`eval_rows.py`), Frame 추정 계수(`frame_model.json`)
-- `plugin/console/`: 시연용 콘솔 artifact 원본(`console.html`)과 시연 데이터(JSON, 로고, Pretendard 글꼴). 게시본은 artifact `AGBNkhgLQkdopHBhSc3eSy`
+- `plugin/console/`: 시연용 콘솔 artifact 원본(`console.html`), 로고, Pretendard 글꼴. 시연 데이터(`cuts·thumbs·panels·work.json`)는 EP12 원본에서 만든 것이라 git에서 제외했고(`.gitignore`), `console_data.py`·`storyboard_panels.py`·`work_data.py`로 다시 만든다. 게시본은 artifact `AGBNkhgLQkdopHBhSc3eSy`
 - `plugin/assets/`: 토스트 로고
 - `plugin/skills/`, `plugin/agents/`, `plugin/hooks/`: 아직 없음. PLAN.md §7 구성대로 만든다
 
@@ -27,3 +27,13 @@ EP12 원작 대본 docx, 콘티 PDF, 정답 시트는 `D:\12_BidProposal\2026062
 ## 이전 위치
 
 개발은 `12_BidProposal\…\07_Implementation\worksheet-pipeline\`(`poc\`)에서 시작했고, 2026-11-23에 이 저장소로 복사했다. 앞으로의 수정은 이 저장소에서만 한다. 원래 폴더는 지우지 않았다.
+
+## Agent skills
+
+### Issue tracker
+
+이슈는 GitHub Issues(`serashin-tech/worksheet-agent`)에 두고 `gh` CLI로 다룬다. 자세한 규칙은 `docs/agents/issue-tracker.md`를 본다.
+
+### Domain docs
+
+단일 컨텍스트(루트 `CONTEXT.md`와 `docs/adr/`)다. 자세한 규칙은 `docs/agents/domain.md`를 본다.
