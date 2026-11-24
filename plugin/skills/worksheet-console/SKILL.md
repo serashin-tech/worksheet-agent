@@ -1,9 +1,11 @@
 ---
 name: worksheet-console
-description: Worksheet 콘솔을 PC에서 로컬 사이트(http://127.0.0.1:8765)로 띄운다. claude.ai Artifact를 쓸 수 없는 곳(Codex 등)이나 Google Drive 커넥터가 꺼진 곳에서 PD가 "콘솔 열어 줘", "워크시트 콘솔 띄워 줘", "사이트로 보여 줘"라고 할 때 쓴다.
+description: Worksheet 콘솔을 PC에서 로컬 사이트(http://127.0.0.1:8765)로 띄운다. claude.ai Artifact를 열 수 있으면 이 스킬이 아니라 게시된 콘솔 artifact(`AGBNkhgLQkdopHBhSc3eSy`)를 연다. Codex처럼 Artifact가 없는 곳이나, 스토리보드 PDF의 칸 나누기·썸네일처럼 Python이 필요한 단계를 진행할 때만 쓴다. PD가 "콘솔 열어 줘", "사이트로 보여 줘", "worksheet-console"이라고 하면 먼저 Artifact를 쓸 수 있는지 확인한다. 시트 xlsx를 만드는 일은 worksheet-build가 맡는다.
 ---
 
 # Worksheet 콘솔 로컬 사이트
+
+먼저 Artifact를 열 수 있는지 본다. 열 수 있으면 게시된 콘솔 artifact를 열고, 시나리오 읽기·컷 목록·에셋·시트 준비는 거기서 한다. 이 스킬의 서버는 Artifact가 없는 곳이거나 스토리보드 칸 나누기가 필요할 때만 띄운다. 스토리보드의 컷 번호는 PDF에서 읽지 않으므로, 콘솔의 ‘컷 번호 짝짓기’에서 PD가 확인한다.
 
 claude.ai에서는 콘솔을 Artifact로 열고 Google Drive·Google Sheets 커넥터로 저장한다. 그 밖의 곳에서는 `serve_console.py`가 콘솔을 로컬 사이트로 열고, 같은 커넥터 호출을 PC 폴더에서 대신 처리한다. 콘솔 화면과 단계는 같다. 다른 점은 Drive 링크 자리에 PC 폴더 경로를 붙여 넣는다는 것뿐이다.
 

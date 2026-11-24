@@ -1,6 +1,6 @@
 ---
 name: worksheet-build
-description: 콘솔에서 확정한 에피소드의 Worksheet xlsx를 만들어 작업 폴더의 01_산출에 Google Sheet로 올린다. PD가 "시트 만들어 줘", "워크시트 올려 줘", "01_산출에 넣어 줘"라고 하거나, 콘솔이 02_작업에 cuts.json을 남긴 뒤 시트를 만들 때 쓴다. Google Drive 커넥터가 없으면(Codex 등) 로컬 모드로 PC 작업 폴더에서 만든다.
+description: 콘솔에서 확정한 에피소드의 Worksheet xlsx를 만들어 작업 폴더의 01_산출에 Google Sheet로 올린다. PD가 "시트 만들어 줘", "워크시트 올려 줘", "01_산출에 넣어 줘"라고 하거나, 콘솔이 02_작업에 cuts.json을 남긴 뒤 시트를 만들 때 쓴다. Google Drive 커넥터가 없으면(Codex 등) 로컬 모드로 PC 작업 폴더에서 만든다. 콘솔을 열거나 보여 달라는 요청에는 쓰지 않는다(그것은 worksheet-console).
 ---
 
 # Worksheet 만들기와 01_산출 업로드
@@ -40,7 +40,7 @@ python -I verify_worksheet.py <out.xlsx> <out.summary.json>
 
 - `-` 자리는 에셋 목록 xlsx다. 옛 `cuts.json`(2-4)이면 그 경로를 넣고 `--asset-images`를 뺀다.
 - FAIL이 있으면 올리기 전에 PD에게 항목을 그대로 보여 준다. 러닝타임 FAIL은 추정 Frame 때문일 수 있어 PD가 올릴지 정한다. 다른 FAIL은 고친 뒤 다시 조립한다.
-- 썸네일 컷 번호 규칙은 EP12에서 육안으로 맞춘 것이다(`thumbnails.ep12_label`). 다른 에피소드는 label_sheets.py로 접촉 시트를 만들어 번호를 먼저 확인한다.
+- 스토리보드 칸의 컷 번호는 콘솔에서 PD가 짝지은 값이 `cuts.json`에 담겨 온다. `thumbnails.ep12_label`은 EP12 시험용 규칙이라 다른 에피소드에는 쓰지 않는다.
 
 ## 4. 01_산출에 올리기
 

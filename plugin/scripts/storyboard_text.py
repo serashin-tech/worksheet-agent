@@ -78,10 +78,10 @@ def ocr(pdf):
     return cells
 
 
-def main(pdf, out):
+def main(pdf, out, label=None):
     cells = ocr(pdf)
     res = {}
-    for pn, i, cut, _ in walk(pymupdf.open(pdf)):
+    for pn, i, cut, _ in walk(pymupdf.open(pdf), *([label] if label else [])):
         res.setdefault(cut, []).append(cells.pop((pn, i), {"dia": "", "note": ""}))
     print("칸에 붙지 않은 글(빈 칸 높이에서 시작):", {k: v for k, v in cells.items() if any(v.values())})
     json.dump(res, open(out, "w", encoding="utf-8"), ensure_ascii=False, indent=0)

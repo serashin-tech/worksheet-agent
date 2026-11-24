@@ -31,7 +31,7 @@ def ep12_label(k):
     return f"C{n:02d}" if n < 100 else f"C{n}"
 
 
-def crop_first_panels(doc, slots):
+def crop_first_panels(doc, slots, label=ep12_label):
     scale = HI_DPI / LDPI
     out = {}
     cache = {}
@@ -44,7 +44,7 @@ def crop_first_panels(doc, slots):
         w = g.shape[1]
         a, b = int((s["y"] + 5) * scale), int((s["y"] + PITCH - 5) * scale)
         x0, x1 = int(w * PIC_X[0]) + 6, int(w * PIC_X[1]) - 6
-        out[ep12_label(k)] = Image.fromarray(g[a:b, x0:x1]).resize((480, 270))
+        out[label(k)] = Image.fromarray(g[a:b, x0:x1]).resize((480, 270))
     return out
 
 

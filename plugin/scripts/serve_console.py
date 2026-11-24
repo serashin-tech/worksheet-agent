@@ -110,7 +110,8 @@ def gen_scenario(path):
 
 
 def gen_storyboard(path):
-    """스토리보드 PDF → 콘솔 thumbs.json·panels.json 내용. OCR(Windows 한국어)이 실패하면 글 없이 그림만 준다."""
+    """스토리보드 PDF → 콘솔 thumbs.json·panels.json 내용. 컷 번호는 모르므로 컷의 첫 칸 순번(S001…)을 키로 주고, 컷 번호는 PD가 콘솔에서 짝짓는다.
+    OCR(Windows 한국어)이 실패하면 글 없이 그림만 준다."""
     import io as _io, tempfile
     sys.path.insert(0, str(HERE))
     import pymupdf
@@ -118,16 +119,17 @@ def gen_storyboard(path):
     from thumbnails import crop_first_panels
     import storyboard_panels as SP
     doc = pymupdf.open(str(path))
+    seq = lambda k: "S%03d" % k
     thumbs = {}
-    for cid, im in crop_first_panels(doc, label_slots(doc)).items():  # 컷의 첫 칸(썸네일): 콘솔 표의 THUMBNAIL
+    for cid, im in crop_first_panels(doc, label_slots(doc), seq).items():  # 컷의 첫 칸(썸네일): 콘솔 표의 THUMBNAIL
         buf = _io.BytesIO(); im.convert("L").resize((176, 99)).save(buf, "JPEG", quality=72)
         thumbs[SP.key(cid)] = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="wsgen_"))
-    SP.main(str(path), str(tmp / "panels.json"))
+    SP.main(str(path), str(tmp / "panels.json"), seq)
     pj = json.loads((tmp / "panels.json").read_text(encoding="utf-8"))
     try:
         import storyboard_text
-        storyboard_text.main(str(path), str(tmp / "text.json"))
+        storyboard_text.main(str(path), str(tmp / "text.json"), seq)
         pj["text"] = json.loads((tmp / "text.json").read_text(encoding="utf-8"))
     except Exception as e:  # ponytail: OCR은 Windows 전용. 다른 OS는 DIALOGUE·NOTE 없이 진행
         print("OCR 실패:", type(e).__name__, e)

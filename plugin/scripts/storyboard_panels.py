@@ -2,7 +2,7 @@
 
 PDF는 쪽마다 5칸 고정 격자다. CUT 열에 번호가 있는 칸이 새 컷의 첫 칸이고,
 번호가 없는 칸은 앞 컷의 이어지는 칸이다. 컷은 칸 순서대로 a, b, c로 부른다.
-컷 번호는 thumbnails.ep12_label 규칙(EP12 육안 확인)을 따른다.
+컷 번호는 기본이 thumbnails.ep12_label 규칙(EP12 육안 확인)이다. label 인자를 주면 그 규칙을 쓴다(콘솔은 순번 S001…을 받아 PD가 컷 번호를 짝짓는다).
 사용: python -I storyboard_panels.py <pdf> <out_json>
 출력: {"C001": [jpeg base64, ...], "C11B": [...], "C0": [...]}  (키는 콘솔의 컷 ID, 추가 컷은 C11B·C0)
 """
@@ -21,13 +21,13 @@ W, H = 240, 135
 
 
 def key(label):
-    """thumbnails 라벨(C01, C100)을 콘솔 ID(C001, C100)로. C11B와 C0은 그대로 둔다."""
-    if label in ("C11B", "C0"):
+    """thumbnails 라벨(C01, C100)을 콘솔 ID(C001, C100)로. C11B·C0과 순번(S001)은 그대로 둔다."""
+    if label in ("C11B", "C0") or label.startswith("S"):
         return label
     return "C%03d" % int(label[1:])
 
 
-def walk(doc):
+def walk(doc, label=ep12_label):
     """그림이 있는 칸마다 (쪽 번호, 칸 번호, 컷 ID, 150dpi 그림 crop)을 PDF 순서대로 낸다."""
     scale = HI_DPI / LDPI
     k, cur = 0, None
@@ -48,14 +48,14 @@ def walk(doc):
                 continue
             if start:
                 k += 1
-                cur = key(ep12_label(k))
+                cur = key(label(k))
             if cur is not None:
                 yield pn, i, cur, crop
 
 
-def main(pdf, out):
+def main(pdf, out, label=ep12_label):
     groups, order = {}, []
-    for _, _, cur, crop in walk(pymupdf.open(pdf)):
+    for _, _, cur, crop in walk(pymupdf.open(pdf), label):
         if cur not in groups:
             groups[cur] = []
             order.append(cur)
