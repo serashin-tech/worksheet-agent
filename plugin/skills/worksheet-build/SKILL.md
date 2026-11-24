@@ -7,7 +7,7 @@ description: 콘솔에서 확정한 에피소드의 Worksheet xlsx를 만들어 
 
 콘솔은 시트를 직접 만들지 못한다. 콘솔은 "시트 만들기"를 누르면 확정값을 `<작업 폴더>/<애니메이션명>/EP##/02_작업/cuts.json`에 남기고, 이 스킬이 그 파일로 xlsx를 만들어 같은 에피소드의 `01_산출`에 올린다. 숫자 계산은 모두 스크립트가 한다(ADR 0003).
 
-스크립트 경로는 `${CLAUDE_PLUGIN_ROOT}/scripts/`다. Python은 늘 `python -I`로 돌린다. 내려받은 파일은 새 빈 폴더(예: 세션 임시 폴더의 `ws_EP12/`)에 둔다.
+스크립트 경로는 이 SKILL.md가 있는 폴더 기준 `../../scripts/`다(Claude Code에서는 `${CLAUDE_PLUGIN_ROOT}/scripts/`와 같다). Python은 늘 `python -I`로 돌린다. 내려받은 파일은 새 빈 폴더(예: 세션 임시 폴더의 `ws_EP12/`)에 둔다.
 
 ## 1. 에피소드 폴더 찾기
 

@@ -1,0 +1,22 @@
+{
+  "name": "worksheet-agent",
+  "version": "0.0.1",
+  "description": "애니메이션 워크시트 에이전트: 원작 대본과 콘티에서 Description 열까지의 Worksheet 초안을 Google Sheet로 만든다",
+  "author": {
+    "name": "Codepresso"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Worksheet Agent",
+    "shortDescription": "에피소드 Worksheet 초안을 Google Sheet로 만든다",
+    "developerName": "Codepresso",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "작업 폴더의 EP12 cuts.json으로 시트 만들어 줘"
+    ]
+  }
+}
