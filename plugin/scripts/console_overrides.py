@@ -13,7 +13,7 @@ SUF = "abcdefghij"
 
 
 def convert(src):
-    ov = {"splits": {}, "frames": {}, "estimated": [], "starts": {}, "fps": src.get("fps", 29.97), "lists": {k: v for k, v in src.get("lists", {}).items() if k != "cam"},
+    ov = {"splits": {}, "frames": {}, "estimated": [], "starts": {}, "fps": src["fps"], "lists": {k: v for k, v in src.get("lists", {}).items() if k != "cam"},
           "title": src.get("title", ""), "assets": src.get("assets") or {}, "rowassets": {}}
     for c in src["cuts"]:
         n, k = int(c["cut"]), int(c.get("split") or 1)
@@ -42,3 +42,6 @@ if __name__ == "__main__":
     t = convert({"fps": 24, "lists": {"cam": ["PAN"], "an": ["a"]}, "cuts": [{"id": "C001", "cut": "1", "split": 2, "frame": 9, "rf": [5, 4], "rfc": [True, False], "rs": [None, 120]}, {"id": "C002", "cut": "2", "split": 1, "frame": 30, "fc": True, "ra": [{"bg": ["EddyIn", "SkyNight"], "ch": ["Eddy"], "pr": [], "count": 1}]}], "assets": {"Matte": [{"name": "밤", "code": "SkyNight"}]}})
     assert t["frames"] == {"C001a": 5, "C001b": 4, "C002": 30} and t["estimated"] == ["C001b"] and t["starts"] == {"C001b": 120} and "cam" not in t["lists"] and t["splits"] == {"1": 2, "2": 1}, t
     assert t["rowassets"] == {"C002": {"bg": ["EddyIn", "SkyNight"], "ch": ["Eddy"], "pr": [], "count": 1}} and t["assets"]["Matte"][0]["code"] == "SkyNight", t
+    assert t["fps"] == 24 and convert({"fps": 29.97, "cuts": []})["fps"] == 29.97  # PD가 정한 FPS를 그대로 넘긴다
+    try: convert({"cuts": []}); raise SystemExit("fps 없이 변환됨")
+    except KeyError: pass  # 숨은 기본값 없음

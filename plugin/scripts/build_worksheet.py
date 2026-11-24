@@ -1,7 +1,7 @@
 """Phase 2: 컷 목록(대본 + 규칙 + PD 결정)으로 Worksheet xlsx를 조립한다. Drive에 올리면 Google Sheet로 변환된다.
 
 계산은 모두 이 스크립트가 한다(AI가 숫자를 쓰지 않는다).
-- Start Frame(기본 101)과 End Frame은 값이고, Frame = End - Start + 1, Sec = ROUND(Frame/FPS,1)은 수식이다(EP12 시트와 같음). FPS는 overrides의 fps, 없으면 29.97
+- Start Frame(기본 101)과 End Frame은 값이고, Frame = End - Start + 1, Sec = ROUND(Frame/FPS,1)은 수식이다(EP12 시트와 같음). FPS는 고정값이 없고 overrides의 fps(콘솔 3단계에서 PD가 정한 값)를 그대로 쓴다. 없으면 만들지 않고 멈춘다
 - Frame 추정값은 End Frame에 들어가며 노란색으로 표시한다. PD가 End를 고치면 일반색으로 바꿔도 된다.
 - 요약은 별도 '요약' 탭에 둔다(2026-11-23 협의). 시트 맨 아래 요약 행은 만들지 않는다. 범위는 마지막 행까지 동적이다.
 - 방영 길이(분)와 목표 컷 수(EP12는 166)는 시나리오와 함께 받는 고정 입력이다. 행 수(분할 포함)는 PD가 썸네일을 보고 분할을 정해야 확정되는 결과라 입력이 아니다. 요약 탭이 총 러닝타임과 컷 수를 이 값과 견준다.
@@ -28,7 +28,7 @@ from extract_meta import cam_moves, SAME as SAME_CAM
 from extract_split import split_count, same_camera
 from extract_assets import load_assets, bg_codes, ch_codes, pr_codes, SKY
 
-FPS, START = 29.97, 101
+START = 101
 MODEL = HERE / "frame_model.json"
 YELLOW = PatternFill("solid", fgColor="FFF2CC")
 GRAY = PatternFill("solid", fgColor="CCCCCC")
@@ -302,6 +302,9 @@ def copy_asset_sheet(asset_xlsx, wb, rig=RIG):
 
 
 def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, target_cuts=None, tol_min=0.5, asset_images=None):
+    fps = overrides.get("fps")
+    if not isinstance(fps, (int, float)) or isinstance(fps, bool) or fps <= 0:
+        raise ValueError(f"overrides.json에 양수 fps가 필요합니다(받은 값: {fps!r}). 콘솔 3단계에서 PD가 정한 FPS를 넘기세요")
     parsed, rows, unknown = derive(docx_path, asset_xlsx, overrides)
     lists = picklists(overrides)
     wb = openpyxl.Workbook()
@@ -321,7 +324,7 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
         frame = estimate(r["feat"]) if est else int(frame)
         est_rows += est
         start = int(overrides.get("starts", {}).get(r["id"], START))
-        ws.append([r["id"], None, "\n".join(r["cam"]), r["same"], f"=ROUND(F{i}/{overrides.get('fps', FPS)},1)", f"=H{i}-G{i}+1", start, start + frame - 1,
+        ws.append([r["id"], None, "\n".join(r["cam"]), r["same"], f"=ROUND(F{i}/{fps:g},1)", f"=H{i}-G{i}+1", start, start + frame - 1,
                    "\n".join(r["bg"]), "\n".join(r["ch"]), "\n".join(r["pr"]), r["count"], r["dialogue"], r["description"]])
         if est:
             ws.cell(i, 8).fill = YELLOW
@@ -384,7 +387,7 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
             c.fill, c.font = GRAY, Font(name="Arial", bold=True)
     sm.column_dimensions["A"].width, sm.column_dimensions["B"].width, sm.column_dimensions["C"].width = 40, 28, 16
     wb.save(out)
-    summary = {"ep": ep, "cuts": n_cuts, "rows": len(rows), "last_row": last, "dup_cuts": dup, "estimated_frame_rows": est_rows,
+    summary = {"fps": fps, "ep": ep, "cuts": n_cuts, "rows": len(rows), "last_row": last, "dup_cuts": dup, "estimated_frame_rows": est_rows,
                "unknown_asset_codes": unknown, "runtime_min": runtime_min, "target_cuts": target_cuts, "tol_min": tol_min, "frames_total": sum(estimate(r["feat"]) if overrides.get("frames", {}).get(r["id"]) is None else int(overrides["frames"][r["id"]]) for r in rows)}
     return summary
 
