@@ -638,7 +638,7 @@ function renderG2() {
       h("label", { class: "row", style: "gap:8px" }, h("input", { type: "checkbox", id: "c2", checked: !!S.confirmed2, onchange: (e) => { S.confirmed2 = e.target.checked; paintBar2(); } }), "SHOT별 BG·CH·PR을 확인하고 확정합니다"),
       h("p", { class: "muted", id: "msg2", style: "font-size:12px;margin:0", role: "status" }),
       h("div", { class: "row" }, h("button", { class: "btn primary", id: "toG3", onclick: () => { commit2(); S.g2 = true; S.built = false; go(3); } }, "에셋 확정하고 워크시트로")))),
-    h("p", { class: "muted" }, "BG·CH·PR은 시리즈 에셋 폴더에 있는 것만 고를 수 있습니다. 노란 칩은 시나리오에서 뽑은 추천이며, PD가 확인하고 확정해야 워크시트에 들어갑니다."),
+    h("p", { class: "muted" }, "BG·CH·PR은 시리즈 에셋 폴더에 있는 것만 고를 수 있습니다. 노란 칩은 시나리오에서 뽑은 추천이며, PD가 확정해야 워크시트에 들어갑니다."),
     h("div", { class: "pane", style: "margin-top:12px" }, h("div", { class: "card", id: "assetBox" }), h("div", {}, h("div", { class: "filters", id: "fl2" }), h("div", { class: "scroll" }, h("div", { class: "list", style: "min-width:640px" },
       h("div", { class: "g2 lh" }, h("span", {}, "CUT"), h("span", {}, "THUMBNAIL"), h("span", {}, "BG"), h("span", {}, "CH"), h("span", {}, "PR")), h("div", { id: "rows2" }))))));
   paintAssets(); paintFilters2(); paintRows2(); paintBar2();
@@ -742,7 +742,7 @@ const CAM_OPTS = ["PAN", "Q-PAN", "Z.I", "Q.Z.I", "Z.O", "S.Z.O", "T.U", "T.D", 
 const LIST_DEF = [["status", "LO·AN 상태", "LO, AN TK01~04, Render TK01~02",["수정", "완료", "진행중", "x", "101f 완료"]], ["rstatus", "Render·Comp 상태", "Render TK03~04, Comp TK01~05", ["수정", "완료", "진행중", "완료/FX대기", "X"]],
   ["ver", "AN 완료 버전", "AN 완료", ["V01", "V02", "V03", "V04", "V05"]], ["an", "LO·AN 작업자", "LO·AN 작업자", ["송민주", "김은엽", "임선형", "윤지민", "탁진영"]],
   ["render", "Render 작업자", "Render 작업자", ["김지희", "심미림"]], ["comp", "Comp 작업자", "Comp 작업자", ["정승환", "김유진"]],
-  ["cam", "Cam Move", "워크시트 표의 Cam Move '+ 선택' (엑셀 C열은 한 칸에 여러 값을 적어 드롭다운을 걸지 않음)", CAM_OPTS]];
+  ["cam", "Cam Move", "워크시트 표의 Cam Move '+ 선택'에 씁니다. 엑셀 C열은 한 칸에 여러 값을 적으므로 드롭다운을 걸지 않습니다.", CAM_OPTS]];
 S.lists = (() => { let v = {}; try { v = JSON.parse(LS.get("wsLists") || "{}") || {}; } catch (e) {} return Object.fromEntries(LIST_DEF.map(([k, , , d]) => [k, Array.isArray(v[k]) ? v[k] : [...d]])); })();
 const listsOk = () => LIST_DEF.every(([k]) => S.lists[k].length > 0);
 function listsCard() {
@@ -758,7 +758,7 @@ function listsCard() {
         String(items) === String(def) ? null : h("button", { class: "btn", style: "margin-left:auto", onclick: () => { S.lists[k] = [...def]; save(); } }, "기본값으로")));
   };
   return h("details", { class: "card", id: "lists3", open: S.listsOpen, ontoggle: (e) => { S.listsOpen = e.target.open; } },
-    h("summary", {}, h("b", {}, "작업현황 드롭다운 목록"), h("span", { class: "muted", style: "font-size:12px" }, `${LIST_DEF.length}개 목록, 항목 ${LIST_DEF.reduce((a, [k]) => a + S.lists[k].length, 0)}개 · 시트를 만들기 전에 상태·작업자 항목을 더하거나 뺍니다`)),
+    h("summary", {}, h("b", {}, "워크시트 드롭다운 목록"), h("span", { class: "muted", style: "font-size:12px" }, `${LIST_DEF.length}개 목록, 항목 ${LIST_DEF.reduce((a, [k]) => a + S.lists[k].length, 0)}개 · 시트를 만들기 전에 상태, 작업자, Cam Move 항목을 더하거나 뺍니다`)),
     h("div", { class: "stack", style: "gap:10px;margin-top:10px" }, ...LIST_DEF.map(row)));
 }
 const START = 101; // 시트의 Start Frame 고정값(build_worksheet.py와 같음)
@@ -841,7 +841,7 @@ function renderResult() {
       t.est ? h("div", { class: "banner" }, `추정 Frame ${fmt(t.est)}행이 들어 있습니다. 총 러닝타임은 추정을 포함한 값입니다. PD가 고친 Frame만 일반색으로 남습니다.`) : null,
       h("dl", { class: "kv" }, ...kv("저장 위치", folderKv("out", "01_산출")), ...kv("입력 원본", folderKv("inp", "00_입력", " (시나리오, 스토리보드)")), ...kv("작업 기록", folderKv("work", "02_작업", " (cuts.json)"))),
       S.req && S.req.st === "bad" ? h("div", { class: "note", role: "status" }, "작업 폴더에 저장하지 못했습니다. " + S.req.msg) : null,
-      h("p", { class: "muted", style: "font-size:12px" }, "폴더와 cuts.json은 작업 폴더에 실제로 저장됩니다. 시트 파일(THUMBNAIL·수식·드롭다운이 든 xlsx)은 플러그인이 cuts.json으로 만들어 01_산출에 올립니다. 시연 화면의 시트 링크는 EP12 조립 시험으로 만든 예시 시트입니다.")),
+      h("p", { class: "muted", style: "font-size:12px" }, "폴더와 cuts.json은 작업 폴더에 저장합니다. 시트 파일(THUMBNAIL·수식·드롭다운이 든 xlsx)은 플러그인이 cuts.json으로 만들어 01_산출에 올립니다. 위의 시트 링크는 EP12 조립 시험으로 만든 예시입니다.")),
     h("div", { class: "grid2", style: "margin-top:16px" },
     h("div", { class: "card stack" }, h("h2", {}, "요약"), h("p", { class: "muted", style: "font-size:12px" }, "요약 탭에 같은 값이 들어갑니다. 시트 맨 아래에는 요약 행을 만들지 않습니다."),
       h("dl", { class: "kv" }, ...kv("시나리오 컷", fmt(t.cuts)), ...kv("시트 행", fmt(t.rows)), ...kv("분할로 늘어난 행", fmt(t.rows - t.cuts)), ...kv("중복 연출 컷", fmt(t.dup)), ...kv("중복 연출 제외 컷", fmt(t.cuts - t.dup)),
@@ -928,7 +928,7 @@ function renderDash() {
   const srcBar = h("div", { class: "card stack" },
     h("div", { class: "row" }, h("span", { class: "tag " + (fromSheet ? "pass" : "warn") }, fromSheet ? "시트에서 읽음" : "시연 기록"),
       h("span", { class: "muted", style: "font-size:12px" }, fromSheet ? `${S.sheet.id ? S.sheet.title || "링크로 고른 시트" : S.builtTitle || curTitle()} · ${src.at.toLocaleTimeString("ko-KR")} 기준` : "EP12 정답 시트의 실제 기록")),
-    h("p", { class: "muted measure", style: "font-size:13px" }, fromSheet ? "고른 시트의 공정 열(LO, AN, Render, Comp)을 읽은 값입니다. 작업자가 시트에 상태와 이름을 적으면 다시 읽을 때 바뀝니다." : (src.msg || "")),
+    h("p", { class: "muted measure", style: "font-size:13px" }, fromSheet ? "고른 시트의 공정 열(LO, AN, Render, Comp)을 읽은 값입니다. 작업자가 시트에 상태와 이름을 적으면 다시 읽을 때 현황에 반영됩니다." : (src.msg || "")),
     h("div", { class: "row" }, h("button", { class: "btn primary", onclick: loadSheetWork }, "시트에서 다시 읽기"),
       fromSheet ? h("button", { class: "btn", onclick: () => { S.W = S.Wdemo; S.wsrc = { kind: "demo", msg: "시연 기록을 보고 있습니다." }; renderDash(); } }, "시연 기록 보기") : null));
   p.append(sheetPicker(), srcBar, chips2,
@@ -936,7 +936,7 @@ function renderDash() {
     h("div", { class: "card stack", style: "margin-top:16px" }, h("h2", {}, "업무별 현황"), legend,
       h("div", {}, tasks.map((tk) => { const c = byTask[tk.k], n = ST.reduce((a, s) => a + c[s[0]], 0); return h("div", { class: "trow" }, h("b", {}, tk.k), seg(c, tk.k), h("span", { class: "nums" }, `완료 ${c.done} · 진행중 ${c.prog} · 수정 ${c.fix} · 배정 ${c.asg} / ${n}`)); }))),
     h("h2", { style: "margin:20px 0 8px" }, "사람별 현황"), h("div", { class: "pgrid" }, people.map(personCard)),
-    h("div", { class: "card stack", style: "margin-top:16px" }, h("h2", {}, "사람과 업무 묶음 표"), h("p", { class: "muted", style: "font-size:12px" }, "칸 수는 해당 묶음에서 그 사람이 작업자로 적힌 칸입니다."),
+    h("div", { class: "card stack", style: "margin-top:16px" }, h("h2", {}, "사람과 업무 묶음 표"), h("p", { class: "muted", style: "font-size:12px" }, "칸 수는 그 사람이 해당 묶음에서 작업자로 적힌 칸의 수입니다."),
       h("div", { class: "scroll" }, h("table", { class: "mx" }, h("thead", {}, h("tr", {}, h("th", {}, "이름"), GROUPS.map((g) => h("th", { class: "n", style: "text-align:right" }, GNAME[g])), h("th", { style: "text-align:right" }, "합계"))),
         h("tbody", {}, people.map((u) => h("tr", {}, h("td", {}, u), GROUPS.map((g) => h("td", { class: "n" }, mx[u][g] || "–")), h("td", { class: "n" }, h("b", {}, GROUPS.reduce((a, g) => a + (mx[u][g] || 0), 0))))))))));
 }
@@ -1043,7 +1043,7 @@ function sheetPicker() {
   const fromLink = () => { const m = inp.value.match(/\/d\/([\w-]{20,})/) || inp.value.trim().match(/^([\w-]{20,})$/); if (m) pickSheet(m[1], ""); else { S.sheets = { ...sh, msg: "Google Sheet 링크(…/spreadsheets/d/…)를 붙여 넣어 주세요." }; renderDash(); } };
   inp.onkeydown = (e) => { if (e.key === "Enter") fromLink(); };
   return h("div", { class: "card stack" }, h("h2", {}, "볼 워크시트"),
-    h("p", { class: "muted measure", style: "font-size:13px" }, "작업 폴더 아래에 있는 Google Sheet를 찾아 고르거나 시트 링크를 붙여 넣습니다. 다른 에피소드의 워크시트도 같은 방법으로 봅니다. 고른 시트는 다음에 열 때도 기억합니다."),
+    h("p", { class: "muted measure", style: "font-size:13px" }, "작업 폴더 아래에 있는 Google Sheet를 찾아 고르거나 시트 링크를 붙여 넣습니다. 다른 에피소드의 워크시트도 같은 방법으로 봅니다. 고른 시트는 이 브라우저에 저장되어 다음에 열 때 다시 나옵니다."),
     h("div", { class: "row" }, h("button", { class: "btn", disabled: !!sh.busy, onclick: findSheets }, sh.busy ? "찾는 중입니다" : "작업 폴더에서 찾기"),
       sh.list ? (sh.list.length ? h("select", { "aria-label": "워크시트 선택", onchange: (e) => { const o = sh.list.find((x) => x.id === e.target.value); if (o) pickSheet(o.id, o.title); } },
         h("option", { value: "" }, `시트 ${sh.list.length}개에서 고르기`), ...sh.list.map((x) => h("option", { value: x.id, selected: x.id === cur }, x.title)))
@@ -1085,10 +1085,10 @@ function renderSetup() {
       step(1, "커넥터 연결", hint("claude.ai 설정의 커넥터에서 Google Drive와 Google Sheets를 추가한 뒤 확인합니다."),
         h("div", { class: "chk", style: "gap:10px 24px" }, Object.keys(CONN).map((n) => { const s = S.conn[n]; return h("span", { class: "chk" }, h("button", { class: "btn primary", disabled: !!(s && s.busy), onclick: () => checkConn(n) }, n + " 연결 확인"), badge(stKey(s))); })),
         ...Object.keys(CONN).map((n) => (S.conn[n] && S.conn[n].msg ? h("div", { class: "note", role: "status" }, S.conn[n].msg) : null))),
-      step(2, "회사 작업 폴더 연결",hint("애니메이션명 / 에피소드 번호 폴더 아래에 00_입력(시나리오·스토리보드), 01_산출(시트), 02_작업(작업 기록) 폴더를 만들어 결과물을 저장합니다. 없는 폴더는 새로 만들고, 있으면 그대로 씁니다."),
+      step(2, "회사 작업 폴더 연결",hint("작업 폴더 아래 애니메이션명 / 에피소드 번호 폴더에 00_입력(시나리오·스토리보드), 01_산출(시트), 02_작업(작업 기록)을 두고 결과물을 저장합니다. 폴더가 없으면 새로 만들고, 있으면 그대로 씁니다."),
         h("div", { class: "chk nowrap" }, inp, h("button", { class: "btn primary", disabled: !!rs.busy, onclick: () => checkRoot(inp) }, "폴더 확인"), badge(rstate, rs.ok ? "읽을 수 있음" : null)),
         rs.msg ? h("div", { class: "note", role: "status" }, rs.msg) : null),
-      step(3, "화면 승인", hint("처음 확인하면 승인 창이 열립니다. 승인해야 폴더와 시트를 읽을 수 있습니다."))));
+      step(3, "화면 승인", hint("처음 확인하면 승인 창이 열립니다. 승인해야 폴더와 시트를 읽고 저장할 수 있습니다."))));
 }
 Promise.all([fetch("cuts.json").then((r) => r.json()), fetch("thumbs.json").then((r) => r.json()), fetch("work.json").then((r) => r.json()), fetch("panels.json").then((r) => r.json())]).then(([D, th, W, pj]) => {
   T = th; P = pj.panels; PO = pj.order; PT = pj.text || {}; S.W = W; S.Wdemo = W; S.title = LS.get("wsTitle") || ""; S.folders.seriesUrl = LS.get("wsSeriesFolder") || ""; // 한 번 확인한 시리즈 에셋 폴더 링크는 다음에 열 때 채워 둔다

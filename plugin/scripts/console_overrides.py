@@ -1,6 +1,6 @@
 """콘솔이 작업 폴더 02_작업에 남긴 cuts.json을 build_worksheet.py의 overrides.json으로 바꾼다.
 
-콘솔에서 PD가 정한 값(분할 수, 행별 Frame과 Start, FPS, 작업현황 드롭다운 목록)을 그대로 옮긴다.
+콘솔에서 PD가 정한 값(분할 수, 행별 Frame과 Start, FPS, 워크시트 드롭다운 목록)을 그대로 옮긴다.
 PD가 확인하지 않은 Frame(콘솔의 추정값)은 값은 넘기되 estimated에 넣어 시트에서 노란색으로 남긴다.
 Same Camera·Cam Move·BG·CH·PR은 아직 넘기지 않는다(build가 시나리오에서 다시 도출).
 사용: python -I console_overrides.py <cuts.json> <overrides.json>
