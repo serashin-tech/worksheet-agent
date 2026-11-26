@@ -47,7 +47,8 @@ button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .mono, .tag, .cr .id, .chip, .flow .no, .flow .dot, .big .url { font-variant-numeric: tabular-nums; }
 .muted { color: var(--muted); }
 header.top { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; justify-content: space-between; padding-block: 18px 12px; }
-header.top .meta { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+header.top .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#wideBtn { min-height: 40px; padding-inline: 14px; }
 .setup-btn { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 14px; font-weight: 700; min-height: 40px; border: 0; border-radius: 8px; padding: 8px 16px; cursor: pointer; background: var(--st-wait); color: var(--st-wait-fg); box-shadow: 0 1px 2px rgba(42, 33, 24, .28), 0 3px 10px rgba(180, 83, 9, .32); transition: transform 150ms ease-out, background-color 150ms ease-out; }
 .setup-btn.ok { background: var(--st-ok); color: var(--st-ok-fg); box-shadow: 0 1px 2px rgba(42, 33, 24, .28), 0 3px 10px rgba(29, 116, 72, .28); }
 .setup-btn:active, .setup .btn:not([disabled]):active { transform: scale(.96); }
@@ -90,6 +91,11 @@ header.top .meta { display: flex; gap: 14px; align-items: center; flex-wrap: wra
 .flow li.cur .tt { color: var(--accent); }
 .flow li.done.cur .dot { color: var(--accent-fg); }
 .flow button[disabled] { opacity: .5; cursor: not-allowed; }
+nav.stages { position: relative; }
+#openAll { position: absolute; top: 5px; right: 5px; z-index: 2; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+#openAll:hover { background: var(--surface-2); color: var(--fg); }
+#openAll[aria-pressed="true"] { color: var(--accent); }
+#openAll:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .flowsum { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 6px 2px 0; }
 @media (max-width: 640px) {
   .flow { flex-direction: column; gap: 4px; padding: 10px 12px; }
@@ -283,12 +289,13 @@ a.link { color: var(--accent); font-weight: 700; overflow-wrap: anywhere; }
   <div class="brand"><img src="logo.png" alt="TOAST Animation Studio 로고" width="44" height="43">
     <div><div class="series">애니메이션 워크시트 에이전트</div><div class="ttl" id="ttl"></div></div></div>
   <div class="meta">
+    <button type="button" class="btn" id="wideBtn" title="페이지 폭 제한을 풀거나 되돌립니다"></button>
     <button type="button" class="setup-btn" id="setupBtn" aria-expanded="false" aria-controls="setup"></button>
-    <label class="row" style="gap:6px"><input type="checkbox" id="openAll"> <span class="muted">모든 단계 열기</span></label>
   </div>
 </header>
-<section class="card setup" id="setup" hidden aria-label="Drive 연결 설정"></section>
-<nav aria-label="진행 단계"><ol class="flow" id="steps"></ol></nav>
+<section class="card setup" id="setup" hidden aria-label="Google 연결 설정"></section>
+<nav class="stages" aria-label="진행 단계"><ol class="flow" id="steps"></ol>
+  <button type="button" id="openAll" aria-pressed="false" aria-label="모든 단계 열기" title="모든 단계 열기"></button></nav>
 
 <section class="panel" id="p0"></section>
 <section class="panel" id="p1" hidden></section>
@@ -373,7 +380,8 @@ function status(i) {
   if (i === 3) return S.built ? ["done", "시트 생성됨"] : ["", S.g2 ? (need3().length ? `확인 필요 ${need3().length}건` : "생성 대기") : "대기"];
   return S.built ? ["", "진행 중인 작업 보기"] : ["", "대기"];
 }
-const open = (i) => $("#openAll").checked || [true, S.uploaded, S.g1, S.g2, S.built][i];
+let OPEN_ALL = false;
+const open = (i) => OPEN_ALL || [true, S.uploaded, S.g1, S.g2, S.built][i];
 const STEP_NAMES = ["시나리오", "스토리보드", "에셋", "워크시트", "작업 현황"];
 function renderSteps() {
   const nav = $("#steps"); nav.replaceChildren();
@@ -393,7 +401,10 @@ function go(i) {
 
 /* ---------- 제목(바꿀 수 있음) ---------- */
 const LS = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
-let WIDE = !!LS.get("wsWide"); document.body.classList.toggle("wide", WIDE); // 넓게 보기 상태(이 브라우저에 저장)
+let WIDE = LS.get("wsWide") !== "0"; // 기본은 넓게 보기, PD가 기본 폭을 고르면 이 브라우저에 저장
+function paintWide() { document.body.classList.toggle("wide", WIDE); const b = $("#wideBtn"); b.setAttribute("aria-pressed", String(WIDE)); b.textContent = WIDE ? "기본 화면" : "넓게 보기"; }
+$("#wideBtn").onclick = () => { WIDE = !WIDE; LS.set("wsWide", WIDE ? "1" : "0"); paintWide(); };
+paintWide();
 const series = () => (S.D.series || "").trim();
 const sp = () => (series() ? series() + "/" : "");
 const defTitle = () => (series() ? series() + " " : "") + (S.D.ep ? "EP" + S.D.ep + " " : "") + "Worksheet";
@@ -910,9 +921,6 @@ function renderReview3() {
       h("input", { type: "number", id: "fps", class: "fr", min: 1, max: 120, step: "0.01", value: FPS, required: true, "aria-required": "true", "aria-label": "러닝타임 계산 FPS",
         onchange: (e) => { const v = +e.target.value; if (v > 0 && v <= 120) { FPS = v; paintStats3(); paintRows3(); } else e.target.value = FPS; } }),
       h("span", { class: "muted", style: "font-weight:400;font-size:12px" }, `기본값은 스토리보드에 적힌 ${SB_META.fps}입니다`)),
-      h("button", { class: "btn", id: "wide3", "aria-pressed": String(WIDE), title: "페이지 폭 제한을 풀어 열 전체를 한 화면에 봅니다",
-        onclick: (e) => { const on = (WIDE = !WIDE); document.body.classList.toggle("wide", on); e.currentTarget.setAttribute("aria-pressed", String(on)); e.currentTarget.textContent = on ? "기본 폭으로" : "넓게 보기"; LS.set("wsWide", on ? "1" : ""); } },
-        WIDE ? "기본 폭으로" : "넓게 보기"),
       h("button", { class: "btn primary", id: "build3", disabled: true, onclick: () => { S.g3 = true; S.built = false; runBuild(); } }, "확정하고 시트 만들기")),
     listsCard(),
     h("div", { class: "card stats", id: "stats3" }),
@@ -1142,7 +1150,11 @@ function renderDash() {
         h("tbody", {}, people.map((u) => h("tr", {}, h("td", {}, u), GROUPS.map((g) => h("td", { class: "n" }, mx[u][g] || "–")), h("td", { class: "n" }, h("b", {}, GROUPS.reduce((a, g) => a + (mx[u][g] || 0), 0))))))))));
 }
 
-document.addEventListener("change", (e) => { if (e.target.id === "openAll") renderSteps(); });
+// 자물쇠 아이콘: 잠김 = 진행한 단계만 열림, 풀림 = 모든 단계 열림
+const LOCK = (open) => `<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="${open ? "M5.5 7V5a2.5 2.5 0 0 1 4.9-.7" : "M5.5 7V5a2.5 2.5 0 0 1 5 0v2"}"/></svg>`;
+function paintOpenAll() { const b = $("#openAll"), t = OPEN_ALL ? "진행한 단계만 열기" : "모든 단계 열기"; b.setAttribute("aria-pressed", String(OPEN_ALL)); b.setAttribute("aria-label", t); b.title = t; b.innerHTML = LOCK(OPEN_ALL); }
+$("#openAll").onclick = () => { OPEN_ALL = !OPEN_ALL; paintOpenAll(); renderSteps(); };
+paintOpenAll();
 /* ---------- Drive 연결 설정: 작업을 시작하기 전에 커넥터와 폴더를 한 번 점검 ---------- */
 const CONN = { "Google Drive": { tool: "search_files", input: { query: "trashed = false", pageSize: 1, excludeContentSnippets: true } }, "Google Sheets": { tool: "get_values", input: () => ({ spreadsheetId: curSheetId(), range: "A1:A1" }) } }; // 확인용 시트는 PD가 5단계에서 고른 시트
 S.conn = { "Google Drive": null, "Google Sheets": null };
@@ -1175,7 +1187,7 @@ async function ensureFolder(mcp, parentId, name) {
   const id = c.payload && (c.payload.id || (c.payload.file && c.payload.file.id)); if (!id) throw { message: name + " 폴더를 만들었지만 ID를 받지 못했습니다" }; return id;
 }
 async function epFolders() {
-  if (!S.root.ok) throw { code: "no_root", message: "작업 폴더를 연결하지 않았습니다. 위의 Google Drive 연결 설정에서 폴더를 확인해 주세요." };
+  if (!S.root.ok) throw { code: "no_root", message: "작업 폴더를 연결하지 않았습니다. 위의 Google 연결 설정에서 폴더를 확인해 주세요." };
   if (!series() || !(Number(S.D.ep) > 0)) throw { code: "no_root", message: "애니메이션명과 에피소드 번호가 있어야 폴더를 만들 수 있습니다." };
   const key = S.root.id + "/" + series() + "/" + epName();
   if (S.epf && S.epf.key === key) return S.epf;
@@ -1231,7 +1243,7 @@ const pickSheet = (id, title) => { S.sheet = { id, title: title || "" }; LS.set(
 async function findSheets() {
   S.sheets = { busy: true }; renderDash();
   try {
-    if (!S.root.ok) throw { code: "no_root", message: "작업 폴더를 먼저 연결해 주세요. 위의 Google Drive 연결 설정에서 확인합니다." };
+    if (!S.root.ok) throw { code: "no_root", message: "작업 폴더를 먼저 연결해 주세요. 위의 Google 연결 설정에서 확인합니다." };
     const mcp = await useMcp();
     const r = await mcp.callTool("Google Drive", "search_files", { query: `'${qs(S.root.id)}' in ancestors and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`, pageSize: 50, orderBy: "modifiedTime desc", excludeContentSnippets: true }, { cache: false });
     S.sheets = { list: ((r.payload && r.payload.files) || []).map((x) => ({ id: x.id, title: x.title })) };
@@ -1272,7 +1284,7 @@ const badge = (k, text) => h("span", { class: "st " + k, role: "status" }, text 
 const stKey = (s) => (s && s.busy ? "busy" : s && s.ok ? "ok" : s ? "bad" : "wait");
 function renderSetup() {
   const btn = $("#setupBtn"), box = $("#setup"), ok = connOk();
-  btn.className = "setup-btn" + (ok ? " ok" : ""); btn.innerHTML = (ok ? '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".28"/><path d="M5.8 10.4l3 3 5.6-6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".28"/><path d="M10 5.2v5.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="10" cy="14.4" r="1.3" fill="currentColor"/></svg>') + "Google Drive 연결 설정";
+  btn.className = "setup-btn" + (ok ? " ok" : ""); btn.innerHTML = (ok ? '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".28"/><path d="M5.8 10.4l3 3 5.6-6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".28"/><path d="M10 5.2v5.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="10" cy="14.4" r="1.3" fill="currentColor"/></svg>') + "Google 연결 설정";
   btn.onclick = () => { box.hidden = !box.hidden; btn.setAttribute("aria-expanded", String(!box.hidden)); };
   box.className = "card setup" + (ok ? " done" : "");
   if (ok && !S.setupOk) { box.hidden = true; btn.setAttribute("aria-expanded", "false"); } // 커넥터 두 개와 작업 폴더가 모두 확인(승인)되는 순간 설정 섹션을 닫는다
@@ -1282,7 +1294,7 @@ function renderSetup() {
   const step = (n, title, ...body) => h("li", { class: "step" }, h("span", { class: "num", "aria-hidden": "true" }, String(n)), h("div", { class: "stack", style: "gap:8px" }, h("b", {}, title), ...body));
   const hint = (t) => h("div", { class: "muted", style: "font-size:13px" }, t);
   box.replaceChildren(
-    h("div", { class: "row", style: "justify-content:space-between" }, h("h2", { style: "margin:0" }, "Google Drive 연결 설정"), h("button", { class: "btn", onclick: () => { box.hidden = true; btn.setAttribute("aria-expanded", "false"); } }, "닫기")),
+    h("div", { class: "row", style: "justify-content:space-between" }, h("h2", { style: "margin:0" }, "Google 연결 설정"), h("button", { class: "btn", onclick: () => { box.hidden = true; btn.setAttribute("aria-expanded", "false"); } }, "닫기")),
     h("p", { class: "muted measure", style: "margin:0" }, "시나리오를 올리기 전에 한 번 설정합니다. 설정하지 않으면 입력 자료와 시트를 저장할 수 없습니다."),
     h("ol", { class: "steps" },
       step(1, "커넥터 연결", hint(LOCAL ? "로컬 콘솔은 커넥터 대신 PC 폴더를 씁니다. 연결 확인만 누르면 됩니다." : "claude.ai 설정의 커넥터에서 Google Drive와 Google Sheets를 추가한 뒤 확인합니다."),
