@@ -8,12 +8,12 @@
 - 공정 열(LO·AN·Render·Comp)은 드롭다운만 만들고 작업자는 비워 둔다.
 사용: python -I build_worksheet.py <docx> <thumbs_dir> <asset_xlsx|-> <out.xlsx> [--asset-images DIR] [--ep 12] [--overrides o.json] [--fit golden.xlsx] [--runtime-min 10] [--target-cuts 166] [--tol-min 0.5]
 overrides.json: {"splits": {"11": 2}, "frames": {"C001": 120}, "estimated": ["C001"], "starts": {"C001b": 151}, "fps": 24, "workers": {...}, "lists": {"an": ["송민주", ...]}}  (게이트 1·2에서 PD가 정한 값)
-  assets: 3단계에서 확정한 에셋 목록 {"BG": [{"name","code","path","fileId","rig","design","note","manual"}], "CH": …, "PR": …, "Matte": …, "2D": …}.
+  assets: 3단계에서 확정한 에셋 목록 {"BG": [{"name","code","path","fileId","rig","img","manual"}. img는 PD가 콘솔에서 바꾼 이미지(PNG base64)로, export_images가 aimg 폴더에 쓴다], "CH": …, "PR": …, "Matte": …, "2D": …}.
     있으면 Asset 탭을 이 목록으로 그리고(렌더 이미지는 --asset-images 폴더의 <코드>.png|jpg), 없으면 asset_xlsx의 Asset 탭을 복사한다.
   rowassets: 시트 행별 {"C001a": {"bg": [...], "ch": [...], "pr": [...], "count": 1}}. 있으면 시나리오 도출값 대신 쓴다.
-  lists: 워크시트 드롭다운 목록(status·rstatus·ver·an·render·comp·rig). rig는 Asset 탭 리깅 열. 콘솔의 '워크시트 드롭다운 목록'에서 PD가 고친 값이고, 없는 키는 LISTS 기본값을 쓴다. cam(Cam Move)은 콘솔 선택지용이라 시트에 드롭다운을 걸지 않는다(한 칸에 여러 값).
+  lists: 워크시트 드롭다운 목록(lostatus·status·rstatus·cstatus·ver·lo·an·render·comp·rig). lostatus·lo는 LO, status·an은 AN TK01~04. rstatus는 Render TK01~04, cstatus는 Comp TK01~05 상태(2026-11-26 PD: Render·Comp 상태를 나눔). rig는 Asset 탭 리깅 열. 콘솔의 '워크시트 드롭다운 목록'에서 PD가 고친 값이고, 없는 키는 LISTS 기본값을 쓴다. cam(Cam Move)은 콘솔 선택지용이라 시트에 드롭다운을 걸지 않는다(한 칸에 여러 값).
 """
-import re, sys, os, json, argparse, pathlib
+import re, sys, os, json, argparse, pathlib, base64
 import numpy as np
 import openpyxl
 from openpyxl.drawing.image import Image as XlImage
@@ -34,21 +34,22 @@ YELLOW = PatternFill("solid", fgColor="FFF2CC")
 GRAY = PatternFill("solid", fgColor="CCCCCC")
 STATUS = ["수정", "완료", "진행중", "x", "101f 완료"]
 RSTATUS = ["수정", "완료", "진행중", "완료/FX대기", "X"]
-WORKERS = {"an": ["송민주", "김은엽", "임선형", "윤지민", "탁진영"], "render": ["김지희", "심미림"], "comp": ["정승환", "김유진"]}
+CSTATUS = list(RSTATUS)
+WORKERS = {"lo": ["송민주", "김은엽", "임선형", "윤지민", "탁진영"], "an": ["송민주", "김은엽", "임선형", "윤지민", "탁진영"], "render": ["김지희", "심미림"], "comp": ["정승환", "김유진"]}
 VERS = ["V01", "V02", "V03", "V04", "V05"]
 
 # 열 배치: (제목, 종류, 목록). 제목이 빈 칸이면 앞 그룹의 보조 열.
 FIXED = ["", "Thumbnail", "Cam\nMove", "Same\nCamera", "Sec", "Frame", "Start\nFrame", "End Frame", "BG", "CH", "PR", "CH_Count", "Dialogue", "Description"]
-PROC = [("LO", "status"), ("작업자", "an"), ("요청사항", None)]
+PROC = [("LO", "lostatus"), ("작업자", "lo"), ("요청사항", None)]
 for k in range(1, 5):
     PROC += [(f"AN TK0{k}", "status"), ("작업자", "an"), ("요청사항", None)]
-PROC += [("AN 완료", "ver"), ("Render TK01", "status"), ("작업자", "render"), ("요청사항", None)]
-for k in range(2, 5):  # EP12 시트: Render TK01·TK02는 LO·AN 상태 목록, TK03부터 Render·Comp 상태 목록
-    PROC += [(f"Render TK0{k}", "status" if k == 2 else "rstatus"), ("요청사항", None)]
+PROC += [("AN 완료", "ver"), ("Render TK01", "rstatus"), ("작업자", "render"), ("요청사항", None)]
+for k in range(2, 5):
+    PROC += [(f"Render TK0{k}", "rstatus"), ("요청사항", None)]
 for k in range(1, 6):
-    PROC += [(f"Comp TK0{k}", "rstatus"), ("작업자", "comp")]
-RIG = ["○", "△", "□"]  # Asset 탭 리깅 열. 범례(K2:N3): ○ 리깅 완료, △ 리깅 중, □ 리깅 요청 필요
-LISTS = {"status": STATUS, "rstatus": RSTATUS, "ver": VERS, "an": WORKERS["an"], "render": WORKERS["render"], "comp": WORKERS["comp"], "rig": RIG}
+    PROC += [(f"Comp TK0{k}", "cstatus"), ("작업자", "comp")]
+RIG = ["○", "△", "□"]  # Asset 탭 리깅 열. 범례(K2:N3): ○ 리깅 완료, △ 리깅 중, □ 리깅 요청
+LISTS = {"lostatus": list(STATUS), "status": STATUS, "rstatus": RSTATUS, "cstatus": CSTATUS, "ver": VERS, "lo": WORKERS["lo"], "an": WORKERS["an"], "render": WORKERS["render"], "comp": WORKERS["comp"], "rig": RIG}
 
 
 def picklists(overrides):
@@ -177,7 +178,7 @@ def draw_asset_sheet(assets, wb, title="", rig=RIG, images=None):
     """3단계(에셋)에서 확정한 목록으로 Asset 탭을 그린다. 모양은 EP12 Asset 탭을 따른다:
     제목 행, 머리글 9열(제작자·설명은 숨김), 분류 행 BG·CH·PR·Matte·2D, 리깅 범례 K2:N3, 리깅 열 드롭다운.
     렌더 이미지는 images 폴더의 <코드>.png|jpg|jpeg|webp를 F열 셀 안에 맞춰 넣는다. 없으면 비워 둔다.
-    디자인 필요 여부는 콘솔 체크를 ○로 적는다(가정: 토스트 확인 전)."""
+    콘솔은 디자인 필요·비고를 받지 않는다(2026-11-26 PD 교정). 옛 cuts.json에 값이 있으면 그대로 적는다."""
     from openpyxl.styles import Border, Side
     from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
     from openpyxl.drawing.xdr import XDRPositiveSize2D
@@ -194,7 +195,7 @@ def draw_asset_sheet(assets, wb, title="", rig=RIG, images=None):
     wa.row_dimensions[2].height = 39
     for r, (k, v) in enumerate([("리깅 완료", "○"), ("리깅 중", "△")], 2):
         wa.cell(r, 11, k); wa.cell(r, 12, v)
-    wa.cell(2, 13, "리깅 요청 필요"); wa.cell(2, 14, "□")
+    wa.cell(2, 13, "리깅 요청"); wa.cell(2, 14, "□")
     for k, w in {"A": 45.5, "B": 51.13, "C": 37, "D": 15.13, "E": 31.63, "F": 66, "G": 60.13, "H": 34.88, "I": 16.75, "K": 24.5, "L": 13.75, "M": 19.75, "N": 13.5}.items():
         wa.column_dimensions[k].width = w
     wa.column_dimensions["D"].hidden = wa.column_dimensions["E"].hidden = True
@@ -292,7 +293,7 @@ def copy_asset_sheet(asset_xlsx, wb, rig=RIG):
         x.width, x.height = int(w * k), int(h * k)
         x.anchor = OneCellAnchor(_from=AnchorMarker(col=c - 1, colOff=int(co * EMU), row=r - 1, rowOff=int(ro * EMU)), ext=XDRPositiveSize2D(int(w * k * EMU), int(h * k * EMU)))
         wa.add_image(x)
-    # 리깅 열 드롭다운: 범례의 ○ 리깅 완료 / △ 리깅 중 / □ 리깅 요청 필요
+    # 리깅 열 드롭다운: 범례의 ○ 리깅 완료 / △ 리깅 중 / □ 리깅 요청
     col = next((c for c in range(1, src.max_column + 1) if src.cell(2, c).value == "리깅"), None)
     if col:
         dv = DataValidation(type="list", formula1='"' + ",".join(rig) + '"', allow_blank=True)
@@ -324,13 +325,21 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
         frame = estimate(r["feat"]) if est else int(frame)
         est_rows += est
         start = int(overrides.get("starts", {}).get(r["id"], START))
+        rt = overrides.get("rowtext", {}).get(r["id"])  # 콘솔 2단계에서 PD가 확인한 스토리보드 DIALOGUE·NOTE가 있으면 그 값
+        dia, desc = (rt["dialogue"], rt["description"]) if rt else (r["dialogue"], r["description"])
         ws.append([r["id"], None, "\n".join(r["cam"]), r["same"], f"=ROUND(F{i}/{fps:g},1)", f"=H{i}-G{i}+1", start, start + frame - 1,
-                   "\n".join(r["bg"]), "\n".join(r["ch"]), "\n".join(r["pr"]), r["count"], r["dialogue"], r["description"]])
+                   "\n".join(r["bg"]), "\n".join(r["ch"]), "\n".join(r["pr"]), r["count"], dia, desc])
         if est:
             ws.cell(i, 8).fill = YELLOW
         ws.row_dimensions[i].height = 64.5
         for col in range(1, len(heads) + 1):
             ws.cell(i, col).alignment = Alignment(wrap_text=True, vertical="center")
+        img = overrides.get("rowimgs", {}).get(r["id"])  # 콘솔 2단계의 칸 그림(PD가 바꾼 그림 포함)이 thumbs 폴더보다 먼저
+        if img:
+            im = XlImage(shrink(base64.b64decode(img), 240))
+            im.width, im.height = 114, 64
+            ws.add_image(im, f"B{i}")
+            continue
         name = None
         if r["first"]:
             name = "C%02d" % r["cut"] if r["cut"] < 100 else "C%d" % r["cut"]

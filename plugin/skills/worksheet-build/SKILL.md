@@ -22,7 +22,7 @@ description: 콘솔에서 확정한 에피소드의 Worksheet xlsx를 만들어 
 
 1. `download_file_content`로 `cuts.json`과 `00_입력`의 시나리오(docx)를 받는다.
 2. 스토리보드 PDF가 7MB를 넘으면 커넥터로 받지 못한다(ADR 0006). PD PC의 Drive 동기화 폴더(`G:\`)에서 같은 경로의 파일을 쓴다. 찾지 못하면 PD에게 로컬 경로를 묻는다.
-3. 에셋은 콘솔 3단계에서 확정한 목록(`cuts.json`의 `assets`)을 쓴다. 에셋마다 `fileId`를 `download_file_content`로 받아 새 빈 폴더 `aimg/`에 `<code>.<확장자>`(png·jpg·jpeg·webp)로 저장한다. 7MB가 넘는 파일은 건너뛰고 PD에게 코드를 알린다(그 칸은 비어서 올라간다). `fileId`가 없는 에셋(손으로 더한 에셋)은 이미지 없이 둔다.
+3. 에셋은 콘솔 3단계에서 확정한 목록(`cuts.json`의 `assets`)을 쓴다. 에셋에 `img`(PD가 콘솔에서 바꾼 이미지, PNG base64)가 있으면 그것을 `aimg/<code>.png`로 쓴다. 없으면 `fileId`를 `download_file_content`로 받아 새 빈 폴더 `aimg/`에 `<code>.<확장자>`(png·jpg·jpeg·webp)로 저장한다. 7MB가 넘는 파일은 건너뛰고 PD에게 코드를 알린다(그 칸은 비어서 올라간다). `fileId`가 없는 에셋(손으로 더한 에셋)은 이미지 없이 둔다.
 4. `assets`가 없는 옛 `cuts.json`이면 PD에게 에셋 목록 xlsx(EP12는 정답 시트의 Asset 탭) 경로를 받는다. 이때 Asset 탭은 그 xlsx를 복사하고, BG·CH·PR 열은 시나리오에서 다시 도출한다.
 
 ## 3. 조립과 검증
@@ -38,6 +38,7 @@ python -I build_worksheet.py <시나리오.docx> <thumbs폴더> - <out.xlsx> --o
 python -I verify_worksheet.py <out.xlsx> <out.summary.json>
 ```
 
+- `cuts.json`의 컷에 `sbp`(콘솔 2단계에서 PD가 확인한 스토리보드 칸)가 있으면 `thumbnails.py`는 돌리지 않고, `<thumbs폴더>` 자리에 빈 폴더를 넣는다. THUMBNAIL은 `sbp`의 칸 그림(PD가 바꾼 그림 포함)을, Dialogue·Description은 `sbp`의 DIALOGUE·NOTE를 쓴다. `sbp`가 없는 컷은 전처럼 시나리오 값을 쓴다. TIME은 시트에 열이 없어 `cuts.json`에만 남는다.
 - `-` 자리는 에셋 목록 xlsx다. 옛 `cuts.json`(2-4)이면 그 경로를 넣고 `--asset-images`를 뺀다.
 - FAIL이 있으면 올리기 전에 PD에게 항목을 그대로 보여 준다. 러닝타임 FAIL은 추정 Frame 때문일 수 있어 PD가 올릴지 정한다. 다른 FAIL은 고친 뒤 다시 조립한다.
 - 스토리보드 칸의 컷 번호는 콘솔에서 PD가 짝지은 값이 `cuts.json`에 담겨 온다. `thumbnails.ep12_label`은 EP12 시험용 규칙이라 다른 에피소드에는 쓰지 않는다.
@@ -54,13 +55,15 @@ python -I verify_worksheet.py <out.xlsx> <out.summary.json>
    - `disableConversionToGoogleType`는 넣지 않는다. Google Sheet로 변환되어야 콘솔 작업현황이 읽는다.
 4. 돌려받은 `viewUrl`을 PD에게 준다. 콘솔 작업현황의 "작업 폴더에서 찾기"를 누르면 이 시트가 목록에 나온다.
 
-## 로컬 모드(Google Drive 커넥터가 없을 때)
+## 로컬 모드(Claude Code·Codex, Google Drive 데스크톱 앱)
 
-Codex처럼 커넥터가 없거나 꺼진 곳에서는 콘솔을 `worksheet-console` 스킬로 띄워 쓴다. 이때 작업 폴더는 PC 경로이고, 1·2·4절의 커넥터 호출 대신 파일을 직접 다룬다. 3절(조립과 검증)은 같다.
+Claude Code·Codex에서는 콘솔을 `worksheet-console` 스킬로 띄워 쓴다(스토리보드가 커넥터 한도 10MB를 넘기 때문). 이때 작업 폴더는 Google Drive 데스크톱 앱의 PC 경로이고, 1·2·4절의 커넥터 호출 대신 파일을 직접 다룬다. 3절(조립과 검증)은 같다.
 
-1. PD에게 작업 폴더 경로와 애니메이션명·에피소드 번호를 받는다. 에피소드 폴더는 `<작업 폴더>\<애니메이션명>\EP12\`다.
+로컬 콘솔은 4단계 "확정하고 시트 만들기"를 누르면 서버(`serve_console.py`의 `build_sheet`)가 아래 3~5를 바로 돌려 `01_산출`에 xlsx를 넣고, 결과 화면에 시트 파일과 검증 결과를 보여 준다. PD가 콘솔 밖에서 "시트 만들어 줘"라고 할 때만 아래 절차를 직접 따른다.
+
+1. 작업 폴더의 PC 경로와 애니메이션명·에피소드 번호를 정한다. PD가 Drive 주소를 주면 `serve_console.py`의 `drive_path(<폴더 id>)`로 PC 경로를 찾는다. 에피소드 폴더는 `<작업 폴더>\<애니메이션명>\EP12\`다.
 2. `02_작업\cuts.json`, `00_입력`의 시나리오와 스토리보드를 그 자리에서 읽는다. 내려받기와 7MB 한도는 없다.
-3. 렌더 이미지는 이렇게 모은다. 콘솔이 에셋 파일의 PC 경로를 `fileId`에 넣어 두었다.
+3. 렌더 이미지는 이렇게 모은다. 콘솔이 에셋 파일의 PC 경로를 `fileId`에 넣어 두었고, PD가 바꾼 이미지는 `img`에 있다. 스크립트가 `img`를 먼저 쓴다.
    ```
    python -I serve_console.py --export-images <cuts.json> <aimg폴더>
    ```
@@ -73,4 +76,4 @@ Codex처럼 커넥터가 없거나 꺼진 곳에서는 콘솔을 `worksheet-cons
 
 ## 아직 넘기지 않는 값
 
-콘솔에서 고친 Same Camera, Cam Move는 cuts.json에 들어 있지만 build_worksheet.py가 시나리오에서 다시 도출한다. BG·CH·PR과 Asset 탭은 3단계 값을 그대로 쓴다. 이 값이 달라졌으면 올린 뒤 시트에서 고치게 PD에게 알린다.
+스토리보드 칸의 DIALOGUE·NOTE·PICTURE는 `sbp`로 넘어간다(3절). 콘솔에서 고친 Same Camera, Cam Move는 cuts.json에 들어 있지만 build_worksheet.py가 시나리오에서 다시 도출한다. BG·CH·PR과 Asset 탭은 3단계 값을 그대로 쓴다. 이 값이 달라졌으면 올린 뒤 시트에서 고치게 PD에게 알린다.

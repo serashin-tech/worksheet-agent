@@ -47,6 +47,20 @@ def paragraphs(lines):
     return out
 
 
+def sentences(text):
+    """NOTE 문단: OCR 줄바꿈을 지우고 한 문장씩 한 줄로 둔다. '#장소' 줄은 따로 둔다.
+    한글 뒤의 . ! ? 다음에서 끊되, '에디. (뒷모습)'처럼 괄호가 이어지면 붙여 둔다. 'B.S.' 같은 영문 약어에서는 끊지 않는다."""
+    out, buf = [], []
+    for line in text.split("\n") + ["#"]:
+        if line.startswith("#"):
+            joined = " ".join(" ".join(buf).split())
+            out += [x for x in re.split(r"(?<=[가-힣][.!?])\s+(?!\()", joined) if x]
+            out.append(" ".join(line.split())); buf = []
+        else:
+            buf.append(line)
+    return "\n".join(out[:-1])
+
+
 def band(y_px, page_h):
     """crop 안의 y(px) -> 칸 번호(0~4).
     칸의 글은 칸 윗선에 거의 붙어 시작해서, OCR 상자가 조금만 위로 잡혀도 앞 칸으로 넘어간다(EP12 C17·C21).
@@ -74,7 +88,7 @@ def ocr(pdf):
         pn, col = int(name[:3]), name[4:]
         for y, text in paragraphs([l for l in r["lines"] or [] if keep(l["text"], col)]):
             c = cells.setdefault((pn, band(y, doc[pn].rect.height)), {"dia": "", "note": ""})
-            c[col] = (c[col] + "\n" + text).strip()
+            c[col] = (c[col] + "\n" + (sentences(text) if col == "note" else text)).strip()
     return cells
 
 
@@ -106,6 +120,9 @@ if __name__ == "__main__":
         assert paragraphs([{"text": "(WIPE)", "x": 0, "y": 100, "h": 30}, {"text": "32. F.S. 약부감.", "x": 0, "y": 160, "h": 30}]) == [[100, "(WIPE)"], [160, "32. F.S. 약부감."]]
         assert band(76, 1683.84) == 0 and band(3650, 1683.84) == 3, (band(76, 1683.84), band(3650, 1683.84))
         assert [keep(t, c) for t, c in [("PAN", "dia"), ("c31A", "dia"), ("SE: 띠리링~", "dia"), ("(WIPE)", "note"), ("AN", "note"), ("6", "note")]] == [False, False, True, True, False, False]
+        assert sentences("#에디 집 내부\n계기판에 연결된 네모모양의 절제\n상자가 보인다. 계기판 앞에서 버튼을 늘러\n조작하는 에디. (뒷모습)") == \
+            "#에디 집 내부\n계기판에 연결된 네모모양의 절제 상자가 보인다.\n계기판 앞에서 버튼을 늘러 조작하는 에디. (뒷모습)"
+        assert sentences("3. 계기판 B.S. 에디가 버튼을\n누른다. 고른다.") == "3. 계기판 B.S. 에디가 버튼을 누른다.\n고른다."
         print("ok")
         t = attach({"C1": [{"dia": "a", "note": ""}], "C1B": [{"dia": "b", "note": "n"}]}, {"panels": {"C1": ["x"], "C1B": ["y"]}}, tg := {"panels": {"C1": ["x", "y"]}})
         assert t == 2 and tg["text"]["C1"][1] == {"dia": "b", "note": "n"}, tg

@@ -98,6 +98,7 @@ def parse(path, speakers=DEFAULT_SPEAKERS):
             place = t
         elif nid == body_id:
             desc, dia = split_para(t, pat)
+            desc = " ".join(desc.split())  # 문단 안의 강제 줄바꿈(w:br)은 한 줄로 합친다
             cuts.append({"cut": len(cuts) + 1, "place": place, "description": desc, "dialogue": dia,
                          "transition": "", "extra": ""})
         elif nid is not None or not cuts:

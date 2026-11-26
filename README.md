@@ -42,14 +42,15 @@ Codex는 시작할 때 Git 마켓플레이스를 새로 읽습니다. 바로 갱
 
 PD가 쓰는 화면은 claude.ai에 Artifact로 게시한 **Worksheet 콘솔**입니다. 원본은 `plugin/console/console.html`입니다. 처음 열 때 Google Drive·Google Sheets 사용을 승인해야 폴더와 시트를 읽고 저장할 수 있습니다.
 
-Codex처럼 Artifact가 없거나 Google Drive 커넥터가 꺼진 곳에서는 같은 콘솔을 로컬 사이트로 엽니다. "워크시트 콘솔 띄워 줘"라고 하면 `worksheet-console` 스킬이 아래 명령으로 서버를 띄웁니다.
+Claude Code와 Codex에서는 같은 콘솔을 로컬 사이트로 엽니다. Google 커넥터는 파일 하나를 10MB까지만 주고받는데 스토리보드 PDF는 대개 그보다 크기 때문입니다. 이 방식에는 **Google Drive 데스크톱 앱**이 필요합니다. "워크시트 콘솔 띄워 줘"라고 하면 `worksheet-console` 스킬이 Claude Code의 커넥터를 확인한 뒤 아래 명령으로 서버를 띄웁니다.
 
 ```
-python -I plugin/scripts/serve_console.py --root "<작업 폴더>" --root "<시리즈 에셋 폴더>"
+python -I plugin/scripts/serve_console.py --connectors "Google Drive,Google Sheets"
 ```
 
-- 주소는 `http://127.0.0.1:8765/`입니다. 서버는 이 PC에서만 열리고, `--root`로 넘긴 폴더 밖은 읽지도 쓰지도 않습니다.
-- 콘솔의 Drive 링크 칸에는 PC 폴더 경로를 붙여 넣습니다. 작업 폴더를 Google Drive 동기화 폴더(`G:\내 드라이브\…`) 안에 두면 저장한 파일이 Drive에도 올라갑니다.
+- 주소는 `http://127.0.0.1:8765/`입니다. 서버는 이 PC에서만 열립니다.
+- 콘솔의 폴더 칸에는 Drive 폴더 주소(`https://drive.google.com/drive/folders/…`)를 붙여 넣습니다. 서버가 데스크톱 앱의 메타데이터 DB에서 그 폴더의 PC 경로(`G:\내 드라이브\…`, `G:\공유 드라이브\…`)를 찾고, 연결한 폴더 안에서만 읽고 씁니다. 저장한 파일은 데스크톱 앱이 Drive에 올립니다.
+- 메타데이터 DB는 Google이 공개한 형식이 아닙니다. 앱이 바뀌어 폴더를 찾지 못하면 `--root "<PC 폴더>"`로 폴더를 직접 넘깁니다.
 - 시연 데이터 없이 시작합니다. PD가 시나리오를 올리면 컷 목록을, 스토리보드 PDF를 올리면 썸네일·칸·대사(OCR, Windows)를 서버가 만들어 화면에 채웁니다. 미리 만든 시연 데이터(`cuts.json·thumbs.json·panels.json·work.json`)로 보여 줄 때만 `--data "<폴더>"`를 붙입니다.
 - Codex의 샌드박스가 `workspace-write`이면 Python 실행이 막힐 수 있습니다. 이때는 스크립트 실행을 승인하거나 샌드박스를 넓힙니다.
 
