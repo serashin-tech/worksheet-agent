@@ -90,7 +90,14 @@ header.top .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap
 .flow li.done .st { color: var(--ok); }
 .flow li.cur .tt { color: var(--accent); }
 .flow li.done.cur .dot { color: var(--accent-fg); }
-.flow button[disabled] { opacity: .5; cursor: not-allowed; }
+.flow button[disabled] { cursor: not-allowed; }
+.flow button[disabled] .tx { opacity: .5; } /* 원형은 불투명하게 둬서 뒤의 연결선이 비치지 않게 한다 */
+.ftree { display: grid; gap: 4px; font-size: 13px; }
+.ftree-path { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.ftree-f { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.ftree-f svg { color: var(--accent); flex: none; }
+.ftree-sep { color: var(--muted); }
+.ftree-leaf { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-2); }
 nav.stages { position: relative; }
 #openAll { position: absolute; top: 5px; right: 5px; z-index: 2; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
 #openAll:hover { background: var(--surface-2); color: var(--fg); }
@@ -307,7 +314,7 @@ a.link { color: var(--accent); font-weight: 700; overflow-wrap: anywhere; }
 <div class="bar" id="bar" hidden><div class="wrap"><p id="barMsg"></p><button class="btn primary" id="barBtn"></button></div></div>
 
 <script>
-/* 로컬 사이트 모드(Codex 등 claude.ai 밖): serve_console.py가 같은 커넥터 호출을 PC 폴더로 처리한다. 폴더 자리에는 Drive 링크 대신 PC 경로를 쓴다 */
+/* 로컬 사이트 모드(Claude Code·Codex): serve_console.py가 같은 커넥터 호출을 Google Drive 데스크톱 앱 폴더로 처리한다. PD는 Drive 폴더 주소를 붙여 넣고, 서버가 PC 경로를 찾는다 */
 const LOCAL = !window.claude && typeof location !== "undefined" && /^(127\.0\.0\.1|localhost)$/.test(location.hostname);
 if (LOCAL) window.claude = { use: async (n) => n !== "mcp" ? null : {
   listTools: async () => ({}),
@@ -319,8 +326,8 @@ if (LOCAL) window.claude = { use: async (n) => n !== "mcp" ? null : {
   } } };
 const lid = (p) => "L" + btoa(String.fromCharCode(...new TextEncoder().encode(p.replace(/\\/g, "/").replace(/\/+$/, "")))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const folderMatch = (v) => v.match(/folders\/([\w-]{10,})/) || v.trim().match(/^([\w-]{20,})$/) || (LOCAL && /^([A-Za-z]:[\\/]|\/)/.test(v.trim()) ? [v, lid(v.trim())] : null);
-const LINK_MSG = LOCAL ? "PC 폴더 경로(예: G:\\내 드라이브\\작업)를 붙여 넣어 주세요." : "Drive 폴더 링크(…/folders/…)를 붙여 넣어 주세요.";
-const LINK_PH = LOCAL ? "G:\\내 드라이브\\…" : "https://drive.google.com/drive/folders/…";
+const LINK_MSG = "Google Drive 폴더 주소(https://drive.google.com/drive/folders/…)를 붙여 넣어 주세요.";
+const LINK_PH = "https://drive.google.com/drive/folders/…";
 let T = {}, P = {}, PO = [], PT = {}; // PT: 스토리보드 칸마다 OCR로 읽은 DIALOGUE·NOTE(storyboard_text.py)
 const sbText = (id, i) => (PT[id] && PT[id][i]) || { dia: "", note: "" };
 const S = { tab: 0, title: "", builtTitle: "", W: null, wfilter: "all", uploaded: false, g1: false, g2: false, built: false, files: { docx: null, pdf: null }, folders: {}, filter1: "all", filter3: "all", sort3: { k: null, d: 1 }, sort1: { k: null, d: 1 }, filter2: "all", D: null, src: {}, confirmed1: false, aattr: {}, extra: [] }; // aattr: 에셋별 리깅·디자인 필요·비고, extra: 폴더에 없어 손으로 더한 에셋
@@ -489,7 +496,7 @@ function folderCard() {
   const fa = folderAssets(), cnt = (k) => Object.keys(fa.assets[k]).length, f = S.folders.series, m = S.folders.seriesMsg;
   const busy = !!(m && m.busy), ok = !!f && !busy, state = busy ? "busy" : ok ? "ok" : m && m.msg ? "bad" : "wait";
   const inp = h("input", { type: "text", id: "fd_series", placeholder: LINK_PH, autocomplete: "off", required: true, "aria-required": "true", "aria-label": "시리즈 에셋 폴더 연결", style: "flex:1;min-width:0;min-height:40px;font-size:14px;padding:8px 12px", value: S.folders.seriesUrl || "", oninput: (e) => { S.folders.seriesUrl = e.target.value; }, onkeydown: (e) => { if (e.key === "Enter") scanFolder("series", inp, btn); } });
-  const btn = h("button", { class: "btn primary", style: "min-height:40px", disabled: busy, onclick: () => scanFolder("series", inp, btn) }, "폴더 확인");
+  const btn = h("button", { class: "btn primary", style: "min-height:40px", disabled: busy, onclick: () => scanFolder("series", inp, btn) }, "폴더 연결");
   const badge = h("span", { class: "st " + state, role: "status" }, busy ? "확인 중" : ok ? "읽을 수 있음" : state === "bad" ? "실패" : "확인 전");
   const s = (v, l) => h("div", {}, h("b", {}, v), h("span", {}, l));
   return h("div", { class: "card stack" }, h("h2", {}, "에셋"),
@@ -721,12 +728,11 @@ function renderUpload() {
     return h("label", { class: "fc" + (opt.wide ? " span2" : "") }, h("span", { class: "fh" }, h("span", {}, label, opt.req ? h("span", { class: "req", "aria-hidden": "true" }, " *") : null), tag), h("input", { type: "text", id: "f_" + k, value: D[k] || "", autocomplete: "off", inputmode: opt.mode, placeholder: opt.ph, required: !!opt.req, "aria-required": opt.req ? "true" : null,
       oninput: (e) => { D[k] = opt.re ? e.target.value.replace(opt.re, "") : e.target.value; if (opt.re) e.target.value = D[k]; if (S.src[k] && S.src[k] !== "직접 입력") S.src[k] = "고침"; tag.textContent = S.src[k] || ""; S.confirmed1 = false; const c = $("#c1"); if (c) c.checked = false; if (k === "series") LS.set("wsSeries", D.series); renderTitle(false); paint(); } }));
   };
-  const checks1 = () => { const tgt = Number(D.target), mism = has && tgt > 0 && tgt !== n; return h("ul", { class: "checks", id: "chk1" },
+  const checks1 = () => { const tgt = Number(D.target), mism = has && tgt > 0 && tgt !== n; return h("div", { class: "stack", id: "chk1" }, h("ul", { class: "checks" },
         [["시나리오 컷 번호 목록", has ? "pass" : "wait", has ? `번호 목록 ${n}개, 번호가 1부터 이어짐` : "시나리오를 올리면 컷 수를 셉니다"],
-         ["시나리오 컷 수가 목표 컷 수와 같음", !has || !(tgt > 0) ? "wait" : mism ? "warn" : "pass", !has ? "시나리오가 필요합니다" : !(tgt > 0) ? "목표 컷 수를 입력해 주세요" : mism ? `시나리오 ${n}컷, 목표 ${tgt}컷. 시나리오는 원작사가 만들어 고칠 수 없으니 PD에게 확인해 주세요` : `${n}컷으로 같음`],
-         ["방영 길이", Number(D.runtime) > 0 ? "pass" : "wait", Number(D.runtime) > 0 ? `${D.runtime}분. 워크시트의 총 러닝타임과 견줍니다` : "시나리오에 없으면 원작사에서 받은 값을 입력해 주세요"],
-         saveCheck("docx", "Drive 저장")]
-          .map(([t, c, d]) => h("li", {}, h("span", { class: "tag " + c }, c === "pass" ? "통과" : c === "warn" ? "확인" : "대기"), h("span", {}, h("b", {}, t), " ", d)))); };
+         ["시나리오 컷 수가 목표 컷 수와 같음", !has || !(tgt > 0) ? "wait" : mism ? "warn" : "pass", !has ? "시나리오가 필요합니다" : !(tgt > 0) ? "목표 컷 수를 입력해 주세요" : mism ? `시나리오 ${n}컷, 목표 ${tgt}컷. 시나리오는 원작사가 만들어 고칠 수 없으니 PD에게 확인해 주세요` : `${n}컷으로 같음`]]
+          .map(([t, c, d]) => h("li", {}, h("span", { class: "tag " + c }, c === "pass" ? "통과" : c === "warn" ? "확인" : "대기"), h("span", {}, h("b", {}, t), " ", d)))),
+        inputPath()); }; // 저장은 확인할 항목이 아니라 "확인하고 스토리보드로"를 누르면 일어나는 일이라 목록 밖에 경로로 보여 준다
   p.append(h("div", { class: "grid2" },
     h("div", { class: "card stack" }, h("h2", {}, "시나리오"),
       dropBox("docx", "시나리오 (.docx, .pptx, .txt, .md)", ".docx,.pptx,.txt,.md", "", readScenario),
@@ -1161,7 +1167,16 @@ S.conn = { "Google Drive": null, "Google Sheets": null };
 S.root = { url: LS.get("wsRoot") || "", ok: false, msg: "" };
 S.folders.seriesUrl = LS.get("wsSeriesFolder") || ""; // 시리즈 에셋 폴더 링크도 회사 작업 폴더처럼 한 번 확인하면 기억한다
 const rootLabel = () => (S.root.ok ? "지정한 작업 폴더/" : "작업 폴더 지정 전/");
-const connOk = () => Object.values(S.conn).every((v) => v && v.ok) && S.root.ok;
+S.dapp = null; // 로컬: Google Drive 데스크톱 앱 상태 {installed, accounts, mount}
+const dappOk = () => !LOCAL || !!(S.dapp && S.dapp.installed && S.dapp.mount);
+const connOk = () => Object.values(S.conn).every((v) => v && v.ok) && dappOk() && S.root.ok;
+async function loadStatus() { // 로컬 연결 설정 1단계: 커넥터는 스킬이 Claude Code에서 확인해 서버에 넘긴 값이다
+  S.dapp = { busy: true }; renderSetup();
+  const j = await fetch("/status").then((r) => r.json()).catch(() => null);
+  S.dapp = (j && j.drive) || { installed: false, mount: "" };
+  Object.keys(S.conn).forEach((n) => { const v = j && j.connectors ? j.connectors[n] : null; S.conn[n] = v == null ? { ok: true, na: true } : { ok: v }; }); // 값이 없으면 Claude Code 밖(Codex)에서 띄운 것: 막지 않는다
+  renderSetup();
+}
 async function checkRoot(inp) {
   const m = folderMatch(inp.value);
   S.root = { url: inp.value.trim(), ok: false, msg: "", busy: true }; if (m) LS.set("wsRoot", S.root.url);
@@ -1171,8 +1186,9 @@ async function checkRoot(inp) {
     const mcp = window.claude && (await window.claude.use("mcp")); if (!mcp) throw { code: "capability_disabled" };
     await mcp.callTool("Google Drive", "search_files", { query: `'${m[1]}' in parents and trashed = false`, pageSize: 1, excludeContentSnippets: true }, { cache: false });
     S.root = { url: inp.value.trim(), id: m[1], ok: true, msg: "" };
-  } catch (e) { S.root = { url: inp.value.trim(), ok: false, msg: connMsg("Google Drive", e).replace(/을 확인하지/, " 폴더를 읽지") }; }
-  renderSetup(); if (S.tab === 0 || S.tab === 4) go(S.tab);
+  } catch (e) { S.root = { url: inp.value.trim(), ok: false, msg: LOCAL && e.message ? e.message : connMsg("Google Drive", e).replace(/을 확인하지/, " 폴더를 읽지") }; }
+  renderSetup(); if (S.root.ok) { $("#setup").hidden = true; $("#setupBtn").setAttribute("aria-expanded", "false"); } // 작업 폴더를 연결하면 설정 카드를 닫는다
+  if (S.tab === 0 || S.tab === 4) go(S.tab);
 }
 /* 작업 폴더 저장: <작업 폴더>/<애니메이션명>/EP##/00_입력·01_산출·02_작업. 있는 폴더는 그대로 쓰고 없는 폴더만 만든다 */
 const FOLDER_MT = "application/vnd.google-apps.folder", MAX_UP = LOCAL ? Infinity : 7 * 1024 * 1024; // Drive 커넥터 요청 본문이 10MB(base64 포함)까지라 약 7MB 파일까지 올라간다(PLAN Phase 0)
@@ -1217,8 +1233,7 @@ async function saveInput(kind) {
 const saveCheck = (kind, title) => {
   const f = S.files[kind], sv = f && f.save, where = rootLabel() + sp() + (S.D.ep ? epName() : "EP##") + "/00_입력";
   const open = (url, t) => h("a", { class: "link", href: url, target: "_blank", rel: "noopener" }, t);
-  if (!f) return [title, "wait", `올리면 ${where}에 저장합니다`];
-  if (!sv) return [title, "wait", `확인하고 넘어가면 ${where}에 저장합니다`];
+  if (!sv) return [title, "wait", kind === "docx" ? `"확인하고 스토리보드로"를 누르면 ${where}에 저장합니다` : `올리면 바로 ${where}에 저장합니다`]; // 시나리오는 애니메이션명·에피소드 번호를 확인한 뒤 저장하고, 스토리보드는 올리는 즉시 저장한다
   if (sv.st === "busy") return [title, "wait", "작업 폴더에 저장하는 중입니다"];
   if (sv.st === "ok") return [title, "pass", h("span", {}, `${where}에 저장했습니다. `, open(sv.url, "열기"))];
   if (sv.st === "big") return [title, "warn", h("span", {}, "파일이 7MB를 넘어 화면에서는 올릴 수 없습니다. 폴더는 만들어 두었으니 직접 넣어 주세요. ", open(sv.url, "00_입력 폴더 열기"))];
@@ -1279,6 +1294,19 @@ async function checkConn(name) {
   } catch (e) { S.conn[name] = { ok: false, msg: connMsg(name, e) }; }
   renderSetup();
 }
+/* 작업 폴더 아래에 만드는 폴더를 아이콘으로 보여 준다: 작업 폴더 › 애니메이션명 › 에피소드 번호 › 00_입력 · 01_산출 · 02_작업 */
+const FOLDER_SVG = '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="currentColor"><path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h3.2l1.5 1.5H13a1.5 1.5 0 0 1 1.5 1.5v6.5A1.5 1.5 0 0 1 13 13H3a1.5 1.5 0 0 1-1.5-1.5z"/></svg>';
+const ftF = (name, note) => { const e = h("span", { class: "ftree-f" }, name, note ? h("span", { class: "muted" }, ` (${note})`) : null); e.insertAdjacentHTML("afterbegin", FOLDER_SVG); return e; };
+const ftSep = () => h("span", { class: "ftree-sep", "aria-hidden": "true" }, "›");
+/* 시나리오·스토리보드를 저장할 실제 경로: 작업 폴더 › 애니메이션명 › EP## › 00_입력 */
+const inputPath = () => h("div", { class: "ftree-path", style: "font-size:13px" }, h("span", {}, "시나리오는"), ftF("작업 폴더"), ftSep(), ftF(series() || "애니메이션명"), ftSep(), ftF(S.D.ep ? epName() : "에피소드 번호"), ftSep(), (() => { const e = ftF("00_입력"); e.append("에 저장됩니다."); return e; })()); // 끝말이 따로 줄바꿈되지 않게 마지막 폴더와 한 덩어리로 둔다
+function folderTree() {
+  const f = ftF, sep = ftSep;
+  return h("div", { class: "ftree", role: "group", "aria-label": "작업 폴더 아래에 만드는 폴더" },
+    h("div", { class: "ftree-path" }, f("작업 폴더"), sep(), f("애니메이션명"), sep(), f("에피소드 번호"), sep(),
+      h("span", { class: "ftree-leaf" }, f("00_입력", "시나리오·스토리보드"), f("01_산출", "워크시트"), f("02_작업", "작업 기록"))),
+    h("div", { class: "muted", style: "font-size:13px" }, "폴더가 없으면 만들고, 있으면 그대로 써서 결과물을 저장합니다."));
+}
 const ST_LABEL = { wait: "확인 전", busy: "확인 중", ok: "연결됨", bad: "실패" };
 const badge = (k, text) => h("span", { class: "st " + k, role: "status" }, text || ST_LABEL[k]);
 const stKey = (s) => (s && s.busy ? "busy" : s && s.ok ? "ok" : s ? "bad" : "wait");
@@ -1287,23 +1315,26 @@ function renderSetup() {
   btn.className = "setup-btn" + (ok ? " ok" : ""); btn.innerHTML = (ok ? '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".28"/><path d="M5.8 10.4l3 3 5.6-6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '<svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".28"/><path d="M10 5.2v5.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="10" cy="14.4" r="1.3" fill="currentColor"/></svg>') + "Google 연결 설정";
   btn.onclick = () => { box.hidden = !box.hidden; btn.setAttribute("aria-expanded", String(!box.hidden)); };
   box.className = "card setup" + (ok ? " done" : "");
-  if (ok && !S.setupOk) { box.hidden = true; btn.setAttribute("aria-expanded", "false"); } // 커넥터 두 개와 작업 폴더가 모두 확인(승인)되는 순간 설정 섹션을 닫는다
-  S.setupOk = ok;
   const rs = S.root, rstate = rs.busy ? "busy" : rs.ok ? "ok" : rs.msg ? "bad" : "wait";
-  const inp = h("input", { type: "text", placeholder: LINK_PH, autocomplete: "off", "aria-label": "회사 작업 폴더 링크", value: rs.url, oninput: (e) => { S.root.url = e.target.value; }, onkeydown: (e) => { if (e.key === "Enter") checkRoot(inp); } });
+  const inp = h("input", { type: "text", placeholder: LINK_PH, autocomplete: "off", "aria-label": "워크시트 작업 폴더 주소", value: rs.url, oninput: (e) => { S.root.url = e.target.value; }, onkeydown: (e) => { if (e.key === "Enter") checkRoot(inp); } });
   const step = (n, title, ...body) => h("li", { class: "step" }, h("span", { class: "num", "aria-hidden": "true" }, String(n)), h("div", { class: "stack", style: "gap:8px" }, h("b", {}, title), ...body));
   const hint = (t) => h("div", { class: "muted", style: "font-size:13px" }, t);
   box.replaceChildren(
     h("div", { class: "row", style: "justify-content:space-between" }, h("h2", { style: "margin:0" }, "Google 연결 설정"), h("button", { class: "btn", onclick: () => { box.hidden = true; btn.setAttribute("aria-expanded", "false"); } }, "닫기")),
-    h("p", { class: "muted measure", style: "margin:0" }, "시나리오를 올리기 전에 한 번 설정합니다. 설정하지 않으면 입력 자료와 시트를 저장할 수 없습니다."),
+    ...(LOCAL ? [] : [h("p", { class: "muted measure", style: "margin:0" }, "시나리오를 올리기 전에 한 번 설정합니다. 설정하지 않으면 입력 자료와 시트를 저장할 수 없습니다.")]),
     h("ol", { class: "steps" },
-      step(1, "커넥터 연결", hint(LOCAL ? "로컬 콘솔은 커넥터 대신 PC 폴더를 씁니다. 연결 확인만 누르면 됩니다." : "claude.ai 설정의 커넥터에서 Google Drive와 Google Sheets를 추가한 뒤 확인합니다."),
-        h("div", { class: "chk", style: "gap:10px 24px" }, Object.keys(CONN).map((n) => { const s = S.conn[n]; return h("span", { class: "chk" }, h("button", { class: "btn primary", disabled: !!(s && s.busy), onclick: () => checkConn(n) }, n + " 연결 확인"), badge(stKey(s))); })),
+      LOCAL ? step(1, "Google 커넥터와 Google Drive 데스크톱 앱", hint("Google 커넥터와 Google Drive 데스크톱 앱을 설정한 뒤, 작업 폴더의 Drive 주소를 넣습니다."),
+        h("div", { class: "chk", style: "gap:10px 24px" }, Object.keys(S.conn).map((n) => { const s = S.conn[n]; return h("span", { class: "chk" }, h("span", {}, n + " 커넥터"), badge(!s ? "wait" : s.na ? "wait" : s.ok ? "ok" : "bad", s && s.na ? "확인 안 함" : s && !s.ok ? "연결 안 됨" : null)); }),
+          h("span", { class: "chk" }, h("span", {}, "Google Drive 데스크톱 앱"), badge(stKey(S.dapp && !S.dapp.busy ? { ok: dappOk() } : S.dapp), S.dapp && !S.dapp.busy ? (dappOk() ? S.dapp.mount + " 연결됨" : "설치·로그인 필요") : null),
+            h("button", { class: "btn", disabled: !!(S.dapp && S.dapp.busy), onclick: loadStatus }, "다시 확인"))),
+        Object.values(S.conn).some((v) => v && !v.ok) ? hint("Claude Code의 커넥터 설정에서 Google Drive와 Google Sheets를 연결한 뒤, Claude Code에 \"워크시트 콘솔 다시 띄워 줘\"라고 말해 주세요.") : null,
+        S.dapp && !S.dapp.busy && !dappOk() ? h("div", { class: "note", role: "status" }, "Google Drive 데스크톱 앱을 설치하고 회사 계정으로 로그인해 주세요. ", h("a", { class: "link", href: "https://www.google.com/drive/download/", target: "_blank", rel: "noopener" }, "설치 페이지 열기"), " 로그인한 뒤 다시 확인을 누릅니다.") : null)
+      : step(1, "커넥터 연결", hint("claude.ai 설정의 커넥터에서 Google Drive와 Google Sheets를 추가한 뒤 확인합니다."),
+        h("div", { class: "chk", style: "gap:10px 24px" }, Object.keys(CONN).map((n) => { const s = S.conn[n]; return h("span", { class: "chk" }, h("button", { class: "btn primary", disabled: !!(s && s.busy), onclick: () => checkConn(n) }, n + " 커넥터 연결"), badge(stKey(s))); })),
         ...Object.keys(CONN).map((n) => (S.conn[n] && S.conn[n].msg ? h("div", { class: "note", role: "status" }, S.conn[n].msg) : null))),
-      step(2, "회사 작업 폴더 연결",hint("작업 폴더 아래 애니메이션명 / 에피소드 번호 폴더에 00_입력(시나리오·스토리보드), 01_산출(시트), 02_작업(작업 기록)을 두고 결과물을 저장합니다. 폴더가 없으면 새로 만들고, 있으면 그대로 씁니다."),
-        h("div", { class: "chk nowrap" }, inp, h("button", { class: "btn primary", disabled: !!rs.busy, onclick: () => checkRoot(inp) }, "폴더 확인"), badge(rstate, rs.ok ? "읽을 수 있음" : null)),
-        rs.msg ? h("div", { class: "note", role: "status" }, rs.msg) : null),
-      step(3, "화면 승인", hint("처음 확인하면 승인 창이 열립니다. 승인해야 폴더와 시트를 읽고 저장할 수 있습니다."))));
+      step(2, "워크시트 작업 폴더 연결", folderTree(),
+        h("div", { class: "chk nowrap" }, inp, h("button", { class: "btn primary", disabled: !!rs.busy || !dappOk(), onclick: () => checkRoot(inp) }, "폴더 연결"), badge(rstate, rs.ok ? "연결됨" : null)),
+        rs.msg ? h("div", { class: "note", role: "status" }, rs.msg) : null)));
 }
 const getJ = (u) => fetch(u).then((r) => (r.ok ? r.json() : null)).catch(() => null);
 Promise.all(["cuts.json", "thumbs.json", "work.json", "panels.json"].map(getJ)).then(([D, th, W, pj]) => {
@@ -1313,6 +1344,7 @@ Promise.all(["cuts.json", "thumbs.json", "work.json", "panels.json"].map(getJ)).
   D.cuts.forEach((c) => { c.reviewed = false; c.fc = false; c.chOk = false; });
   D.series = ""; D.ep = ""; S.D = D; renderTitle(false); go(0); // 시나리오를 올리기 전에는 애니메이션명·에피소드 번호를 비워 두고 placeholder만 보인다
   renderSetup(); $("#setup").hidden = false; $("#setupBtn").setAttribute("aria-expanded", "true");
+  if (LOCAL) loadStatus().then(() => { if (S.root.url && dappOk()) checkRoot({ value: S.root.url }); }); // 전에 연결한 작업 폴더는 다시 연결하고, 성공하면 카드를 닫는다
 }).catch(() => { $("#p0").textContent = "예시 데이터를 불러오지 못했습니다. 페이지를 다시 열어 주세요."; });
 </script>
 

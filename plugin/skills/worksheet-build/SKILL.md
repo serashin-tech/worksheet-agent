@@ -54,11 +54,11 @@ python -I verify_worksheet.py <out.xlsx> <out.summary.json>
    - `disableConversionToGoogleType`는 넣지 않는다. Google Sheet로 변환되어야 콘솔 작업현황이 읽는다.
 4. 돌려받은 `viewUrl`을 PD에게 준다. 콘솔 작업현황의 "작업 폴더에서 찾기"를 누르면 이 시트가 목록에 나온다.
 
-## 로컬 모드(Google Drive 커넥터가 없을 때)
+## 로컬 모드(Claude Code·Codex, Google Drive 데스크톱 앱)
 
-Codex처럼 커넥터가 없거나 꺼진 곳에서는 콘솔을 `worksheet-console` 스킬로 띄워 쓴다. 이때 작업 폴더는 PC 경로이고, 1·2·4절의 커넥터 호출 대신 파일을 직접 다룬다. 3절(조립과 검증)은 같다.
+Claude Code·Codex에서는 콘솔을 `worksheet-console` 스킬로 띄워 쓴다(스토리보드가 커넥터 한도 10MB를 넘기 때문). 이때 작업 폴더는 Google Drive 데스크톱 앱의 PC 경로이고, 1·2·4절의 커넥터 호출 대신 파일을 직접 다룬다. 3절(조립과 검증)은 같다.
 
-1. PD에게 작업 폴더 경로와 애니메이션명·에피소드 번호를 받는다. 에피소드 폴더는 `<작업 폴더>\<애니메이션명>\EP12\`다.
+1. 작업 폴더의 PC 경로와 애니메이션명·에피소드 번호를 정한다. PD가 Drive 주소를 주면 `serve_console.py`의 `drive_path(<폴더 id>)`로 PC 경로를 찾는다. 에피소드 폴더는 `<작업 폴더>\<애니메이션명>\EP12\`다.
 2. `02_작업\cuts.json`, `00_입력`의 시나리오와 스토리보드를 그 자리에서 읽는다. 내려받기와 7MB 한도는 없다.
 3. 렌더 이미지는 이렇게 모은다. 콘솔이 에셋 파일의 PC 경로를 `fileId`에 넣어 두었다.
    ```

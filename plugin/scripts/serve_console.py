@@ -1,16 +1,18 @@
-"""Worksheet 콘솔을 로컬 사이트로 띄운다(Codex처럼 claude.ai Artifact가 없는 곳에서 쓴다).
+"""Worksheet 콘솔을 로컬 사이트로 띄운다(Claude Code·Codex에서 쓴다).
 
 콘솔은 Google Drive·Google Sheets 커넥터를 부르는데, 로컬에서는 이 서버가 같은 호출(search_files, create_file, get_values)을
-PC 폴더에서 대신 처리한다. 작업 폴더를 Google Drive 동기화 폴더(G:\\내 드라이브\\…) 안에 두면 저장한 파일이 Drive에도 올라간다.
-- 폴더·파일 id는 절대 경로를 base64url로 감싼 값("L"로 시작)이다. 콘솔에는 Drive 링크 대신 폴더 경로를 붙여 넣는다.
-- --root로 준 폴더(여러 개 가능) 안에서만 읽고 쓴다. 127.0.0.1에만 열린다.
+Google Drive 데스크톱 앱의 동기화 폴더(G:\\내 드라이브\\…)에서 대신 처리한다. 커넥터의 10MB 한도 없이 큰 스토리보드도 다룬다.
+- PD는 콘솔에 Drive 폴더 주소(…/folders/<id>)를 붙여 넣는다. 서버는 데스크톱 앱의 메타데이터 DB에서 그 id의 PC 경로를 찾는다.
+- 폴더·파일 id는 절대 경로를 base64url로 감싼 값("L"로 시작)이다.
+- 콘솔에서 연결한 Drive 폴더와 --root로 준 폴더 안에서만 읽고 쓴다. 127.0.0.1에만 열린다.
+- /status는 Claude Code가 확인한 커넥터(--connectors)와 데스크톱 앱 상태를 콘솔의 연결 설정 1단계에 준다.
 - Google Sheet 대신 xlsx를 시트로 본다(작업 현황은 xlsx의 첫 탭 값을 읽는다).
 - 콘솔이 쓰는 데이터(컷·썸네일·스토리보드 칸)는 PD가 파일을 올릴 때 /gen이 기존 스크립트로 만든다. 시연 데이터(--data)는 없어도 된다.
-사용: python -I serve_console.py --root <작업 폴더> [--root <에셋 폴더>] [--data <시연 json 폴더>] [--port 8765] [--no-open]
+사용: python -I serve_console.py [--connectors "Google Drive,Google Sheets"] [--root <폴더>] [--data <시연 json 폴더>] [--port 8765] [--no-open]
 렌더 이미지 모으기(worksheet-build 로컬 모드): python -I serve_console.py --export-images <cuts.json> <aimg 폴더>
 완성한 xlsx 넣기(worksheet-build 로컬 모드): python -I serve_console.py --publish <cuts.json> <out.xlsx> <01_산출 폴더>
 """
-import argparse, base64, binascii, json, os, pathlib, re, sys, threading, webbrowser
+import argparse, base64, binascii, json, os, pathlib, re, sqlite3, string, sys, threading, webbrowser
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
@@ -32,7 +34,60 @@ def to_id(p):
     return "L" + base64.urlsafe_b64encode(str(pathlib.Path(p).resolve().as_posix()).encode()).decode().rstrip("=")
 
 
+DRIVEFS = pathlib.Path(os.environ.get("LOCALAPPDATA", "")) / "Google" / "DriveFS"
+TOPS = ("내 드라이브", "My Drive", "공유 드라이브", "Shared drives")
+
+
+def drive_mount():
+    """데스크톱 앱이 붙인 드라이브(보통 G:). 맨 위에 '내 드라이브' 같은 폴더가 있는 드라이브를 찾는다."""
+    for c in string.ascii_uppercase[3:]:
+        if any((pathlib.Path(f"{c}:/") / t).is_dir() for t in TOPS):
+            return pathlib.Path(f"{c}:/")
+    return None
+
+
+def drive_status():
+    return {"installed": DRIVEFS.is_dir(), "accounts": len(list(DRIVEFS.glob("*/metadata_sqlite_db"))) if DRIVEFS.is_dir() else 0,
+            "mount": str(drive_mount() or "")}
+
+
+def drive_path(fid):
+    """Drive 폴더 id → PC 경로. 데스크톱 앱의 메타데이터 DB(items·stable_parents)로 상위 폴더 이름을 따라 올라간다.
+    ponytail: Google이 공개하지 않은 DB 형식이다. 앱이 바꾸면 None이 되고, 콘솔은 폴더를 찾지 못했다고 알린다."""
+    mount = drive_mount()
+    if not mount or not DRIVEFS.is_dir():
+        return None
+    for db in DRIVEFS.glob("*/metadata_sqlite_db"):
+        try:
+            con = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+            con.text_factory = lambda b: b.decode("utf-8", "replace")
+            row = con.execute("select stable_id from items where id = ? and trashed = 0", (fid,)).fetchone()
+            parts, sid = [], row and row[0]
+            while sid and len(parts) < 64:
+                t = con.execute("select local_title from items where stable_id = ?", (sid,)).fetchone()
+                if not t:
+                    break
+                parts.append(t[0])
+                q = con.execute("select parent_stable_id from stable_parents where item_stable_id = ?", (sid,)).fetchone()
+                sid = q and q[0]
+            con.close()
+        except sqlite3.Error:
+            continue
+        parts.reverse()  # 맨 앞은 '내 드라이브'이거나 공유 드라이브 이름
+        for p in (mount.joinpath(*parts), mount.joinpath("공유 드라이브", *parts), mount.joinpath("Shared drives", *parts)):
+            if parts and p.is_dir():
+                return p.resolve()
+    return None
+
+
 def from_id(i, roots):
+    if i and not i.startswith("L") and re.fullmatch(r"[\w-]{10,}", i):  # Drive 폴더 id: 데스크톱 앱 폴더로 바꾸고, 연결한 폴더로 허용한다
+        p = drive_path(i)
+        if not p:
+            raise Fail("not_found", "Google Drive 데스크톱 앱에서 이 폴더를 찾지 못했습니다. 앱에 로그인했는지, 폴더가 내 드라이브나 공유 드라이브에 있는지 확인해 주세요.", 404)
+        if p not in roots:
+            roots.append(p)
+        return p
     if not i or not i.startswith("L"):
         raise Fail("not_found", f"로컬 폴더 id가 아닙니다: {i}", 404)
     try:
@@ -143,7 +198,7 @@ GEN = {"scenario": gen_scenario, "storyboard": gen_storyboard}
 TOOLS = {("Google Drive", "search_files"): search_files, ("Google Drive", "create_file"): create_file, ("Google Sheets", "get_values"): get_values}
 
 
-def handler(roots, data):
+def handler(roots, data, connectors):
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):
             pass
@@ -156,6 +211,8 @@ def handler(roots, data):
             u = urlparse(self.path)
             if u.path in ("/", "/index.html"):
                 return self.send(200, (HEAD + (CONSOLE / "console.html").read_text(encoding="utf-8") + "</body></html>").encode(), "text/html; charset=utf-8")
+            if u.path == "/status":  # 연결 설정 1단계: Claude Code가 확인한 커넥터와 데스크톱 앱 상태
+                return self.send(200, {"drive": drive_status(), "connectors": connectors})
             if u.path == "/open":  # 콘솔의 폴더·파일 링크: 탐색기나 연결된 앱으로 연다
                 try:
                     os.startfile(from_id(parse_qs(u.query).get("id", [""])[0], roots))  # noqa: Windows 전용
@@ -266,7 +323,7 @@ def self_check(tmp):
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", action="append", default=[]); ap.add_argument("--data"); ap.add_argument("--port", type=int, default=8765)
+    ap.add_argument("--root", action="append", default=[]); ap.add_argument("--connectors", help="Claude Code에서 연결을 확인한 커넥터(쉼표로 구분)"); ap.add_argument("--data"); ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true"); ap.add_argument("--self-check"); ap.add_argument("--export-images", nargs=2, metavar=("CUTS", "OUT"))
     ap.add_argument("--publish", nargs=3, metavar=("CUTS", "XLSX", "OUT_DIR"))
     a = ap.parse_args()
@@ -277,17 +334,19 @@ if __name__ == "__main__":
     if a.self_check:
         self_check(a.self_check); sys.exit()
     roots = [pathlib.Path(r).resolve() for r in a.root]
-    if not roots or not all(r.is_dir() for r in roots):
-        sys.exit("--root로 있는 폴더를 하나 이상 주세요(작업 폴더, 에셋 폴더).")
+    if not all(r.is_dir() for r in roots):
+        sys.exit("--root에 없는 폴더가 있습니다.")
+    connectors = None if a.connectors is None else {n: n in [x.strip() for x in a.connectors.split(",")] for n in ("Google Drive", "Google Sheets")}
     data = pathlib.Path(a.data).resolve() if a.data else (CONSOLE if (CONSOLE / "cuts.json").exists() else None)
     if not data or not (data / "cuts.json").exists():
         data = None
         print("시연 데이터 없이 시작합니다. 시나리오와 스토리보드를 올리면 콘솔이 그 파일로 데이터를 만듭니다.")
-    srv = ThreadingHTTPServer(("127.0.0.1", a.port), handler(roots, data))
+    srv = ThreadingHTTPServer(("127.0.0.1", a.port), handler(roots, data, connectors))
     url = f"http://127.0.0.1:{a.port}/"
     print("콘솔:", url)
     for r in roots:
         print("허용 폴더:", r)
+    print("데스크톱 앱:", drive_status())
     if not a.no_open:
         threading.Timer(0.5, webbrowser.open, [url]).start()
     srv.serve_forever()
