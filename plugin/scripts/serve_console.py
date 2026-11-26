@@ -403,7 +403,11 @@ def self_check(tmp):
         create_file({"title": "../x", "parentId": rid}, roots); assert False
     except Fail:
         pass
-    assert get_values({"spreadsheetId": "1AYqLq2Fn7e3cWHoiK9"}, roots) == {"values": []}
+    for bad in ("1AYqLq2Fn7e3cWHoiK9", create_file({"title": "a.txt", "parentId": rid, "textContent": "x"}, roots)["id"]):  # 없는 Drive id, xlsx 아닌 파일
+        try:
+            get_values({"spreadsheetId": bad}, roots); assert False, bad
+        except Fail:
+            pass
     img = root / "Pororo.png"; img.write_bytes(b"x")
     (root / "c.json").write_text(json.dumps({"assets": {"CH": [{"code": "Pororo", "fileId": to_id(img)}, {"code": "Hand"}, {"code": "Hat", "img": base64.b64encode(b"PNG").decode()}]}}), encoding="utf-8")
     export_images(root / "c.json", root / "aimg")
