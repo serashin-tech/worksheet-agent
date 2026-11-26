@@ -55,14 +55,14 @@ header.top .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap
 .setup { margin-bottom: 16px; display: grid; gap: 14px; border-left: 6px solid var(--st-wait); transition: border-color 150ms ease-out; }
 .setup.done { border-left-color: var(--st-ok); }
 .setup[hidden] { display: none; }
-.setup .btn { min-height: 40px; transition: transform 150ms ease-out, opacity 150ms ease-out; }
+.setup .btn, .shpick .btn { min-height: 40px; transition: transform 150ms ease-out, opacity 150ms ease-out; }
 .setup .steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 18px; }
 .setup .step { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
 .setup .num { width: 28px; height: 28px; border-radius: 50%; background: var(--fg); color: var(--surface); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
-.setup .chk { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.setup .chk.nowrap { flex-wrap: nowrap; }
+.setup .chk, .shpick .chk { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.setup .chk.nowrap, .shpick .chk.nowrap { flex-wrap: nowrap; }
 .setup .lbl { font-size: 13px; font-weight: 700; margin-bottom: -4px; }
-.setup input[type="text"] { flex: 1; min-width: 0; min-height: 40px; font: inherit; font-size: 14px; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; }
+.setup input[type="text"], .shpick input[type="text"] { flex: 1; min-width: 0; min-height: 40px; font: inherit; font-size: 14px; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; }
 .st { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 13px; font-weight: 700; border-radius: 999px; padding: 6px 12px; }
 .st::before { font-size: 12px; font-weight: 800; }
 .st.wait { background: var(--st-wait); color: var(--st-wait-fg); } .st.wait::before { content: "!"; }
@@ -70,7 +70,7 @@ header.top .meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap
 .st.ok { background: var(--st-ok); color: var(--st-ok-fg); } .st.ok::before { content: "✓"; }
 .st.bad { background: var(--st-bad); color: var(--st-bad-fg); } .st.bad::before { content: "✕"; }
 @media (hover: hover) { .setup .btn.primary:not([disabled]):hover { filter: brightness(1.1); } .setup-btn:hover { filter: brightness(1.08); } }
-@media (max-width: 640px) { .setup .chk.nowrap { flex-wrap: wrap; } .setup input[type="text"] { flex-basis: 100%; } }
+@media (max-width: 640px) { .setup .chk.nowrap, .shpick .chk.nowrap { flex-wrap: wrap; } .setup input[type="text"], .shpick input[type="text"] { flex-basis: 100%; } }
 :root { --st-wait: #b45309; --st-wait-fg: #fff; --st-ok: #1d7448; --st-ok-fg: #fff; --st-bad: #b3261e; --st-bad-fg: #fff; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --st-wait: #f0b050; --st-wait-fg: #2a1a00; --st-ok: #5dc58c; --st-ok-fg: #0c2a1a; --st-bad: #ff8a80; --st-bad-fg: #3a0a07; } }
 :root[data-theme="dark"] { --st-wait: #f0b050; --st-wait-fg: #2a1a00; --st-ok: #5dc58c; --st-ok-fg: #0c2a1a; --st-bad: #ff8a80; --st-bad-fg: #3a0a07; }
@@ -196,6 +196,8 @@ input[type=file]::file-selector-button { font: inherit; background: var(--surfac
 .stats div { display: flex; flex-direction: column; }
 .stats b { font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .stats span { font-size: 12px; color: var(--muted); }
+.fpsk { display: flex; flex-direction: column; }
+.fpsk input { width: 88px; font-size: 18px; font-weight: 700; padding: 0 6px; font-variant-numeric: tabular-nums; }
 .filters { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0; }
 .filters button { border: 1px solid transparent; box-shadow: var(--ring); background: var(--surface); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
 .filters button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); box-shadow: none; }
@@ -210,7 +212,7 @@ input[type=file]::file-selector-button { font: inherit; background: var(--surfac
 .cr:last-child { border-bottom: 0; }
 .cr.need { background: var(--warn-soft); }
 .cr img { width: 100px; height: 56px; object-fit: cover; border-radius: 4px; background: var(--surface-2); display: block; }
-.lh.w3, .cr.w3 { grid-template-columns: 96px 128px minmax(110px, 1fr) minmax(96px, 0.6fr) 48px 56px 80px 80px minmax(120px, 1fr) minmax(140px, 1.2fr) minmax(120px, 1fr) 56px minmax(180px, 2fr) minmax(220px, 2.6fr); gap: 10px; } /* 엑셀 시트와 같은 열: Cut … Description. 숫자 열과 고정(sticky) CUT·THUMBNAIL은 고정 폭, 글 열은 최소 폭을 지키며 남는 폭을 나눠 가진다 */
+.lh.w3, .cr.w3 { grid-template-columns: 72px 128px minmax(150px, 1fr) minmax(96px, 0.6fr) 48px 56px 80px 80px minmax(120px, 1fr) minmax(140px, 1.2fr) minmax(120px, 1fr) 56px minmax(180px, 2fr) minmax(220px, 2.6fr); gap: 10px; } /* 엑셀 시트와 같은 열: Cut … Description. 숫자 열과 고정(sticky) CUT·THUMBNAIL은 고정 폭, 글 열은 최소 폭을 지키며 남는 폭을 나눠 가진다 */
 .cr.w3 .code { white-space: pre-line; font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
 .cr.w3 .n { text-align: right; font-variant-numeric: tabular-nums; }
 .cr.w3.sub { border-top: 0; }
@@ -266,12 +268,14 @@ input[type=file]::file-selector-button { font: inherit; background: var(--surfac
 .ws .scroll { overscroll-behavior-x: contain; }
 #rows3 .cr.w3:has(+ .sub) { border-bottom-style: dashed; }
 #rows3 > div:last-child > .cr.w3:last-child { border-bottom: 0; }
-/* CUT(0~120px)과 THUMBNAIL(120~258px) 열을 고정한다. 칸 사이 간격(10px)까지 덮어 가로로 넘길 때 뒤 열이 비치지 않게 한다 */
+/* CUT(0~96px)과 THUMBNAIL(96~234px) 열을 고정한다. 칸 사이 간격(10px)까지 덮어 가로로 넘길 때 뒤 열이 비치지 않게 한다 */
 .lh.w3 > :nth-child(-n+2), .cr.w3 > :nth-child(-n+2) { position: sticky; z-index: 1; margin-block: -10px; padding-block: 10px; }
 .lh.w3 > :first-child, .cr.w3 > :first-child { left: 0; margin-inline: -14px -10px; padding-inline: 14px 10px; }
-.lh.w3 > :nth-child(2), .cr.w3 > :nth-child(2) { left: 120px; margin-right: -10px; padding-right: 10px; box-shadow: 1px 0 0 var(--line); }
+.lh.w3 > :nth-child(2), .cr.w3 > :nth-child(2) { left: 96px; margin-right: -10px; padding-right: 10px; box-shadow: 1px 0 0 var(--line); }
 .lh.w3 > :nth-child(-n+2) { background: var(--surface-2); }
 .cr.w3 > :nth-child(-n+2) { background: var(--surface); align-self: stretch; }
+.lh.w3 > :nth-child(3), .cr.w3 > :nth-child(3) { padding-left: 12px; } /* 고정된 THUMBNAIL 칸에 Cam Move가 붙지 않게 */
+.lh.w3 > :nth-child(12), .cr.w3 > :nth-child(12) { text-align: center; } /* CH Count */
 .cr.w3.need > :nth-child(-n+2) { background: var(--warn-soft); }
 @media (hover: hover) { #rows3 .cr.w3:not(.need):hover, #rows3 .cr.w3:not(.need):hover > :nth-child(-n+2) { background: var(--surface-2); } }
 @media (prefers-reduced-motion: no-preference) { #rows3 .cr.w3, #rows3 .cr.w3 > :nth-child(-n+2) { transition: background-color 150ms ease-out; } }
@@ -969,13 +973,13 @@ const cmpId = (a, b) => a.id.localeCompare(b.id, "en", { numeric: true });
 function renderReview3() {
   const p = $("#p3"); p.replaceChildren();
   if (!S.splitSb) { S.splitSb = true; S.D.cuts.forEach((c) => { const n = P[c.id] ? P[c.id].length : 0; if (n) { c.split = n; c.splitAuto = false; } }); } // 시트 행은 스토리보드 SHOT과 같게(C001a, C001b …)
-  p.append(h("div", { class: "ws" }, h("div", { class: "card row tb" }, h("label", { class: "row", style: "gap:8px;font-weight:600" }, h("span", {}, "러닝타임 계산 FPS", h("span", { class: "req", "aria-hidden": "true" }, " *")),
-      h("input", { type: "number", id: "fps", class: "fr", min: 1, max: 120, step: "0.01", value: FPS, required: true, "aria-required": "true", "aria-label": "러닝타임 계산 FPS",
-        onchange: (e) => { const v = +e.target.value; if (v > 0 && v <= 120) { FPS = v; paintStats3(); paintRows3(); } else e.target.value = FPS; } }),
-      h("span", { class: "muted", style: "font-weight:400;font-size:12px" }, `기본값은 스토리보드에 적힌 ${SB_META.fps}입니다`)),
-      h("button", { class: "btn primary", id: "build3", disabled: true, onclick: () => { S.g3 = true; S.built = false; runBuild(); } }, "확정하고 시트 만들기")),
+  p.append(h("div", { class: "ws" },
     listsCard(),
-    h("div", { class: "card stats", id: "stats3" }),
+    h("div", { class: "card stats", id: "stats3" }, h("div", { id: "st3a", style: "display:contents" }), // 숫자는 paintStats3가 채우고, FPS 칸과 버튼은 다시 그리지 않아 입력 중 포커스가 남는다
+      h("label", { class: "fpsk" }, h("input", { type: "number", id: "fps", class: "fr", min: 1, max: 120, step: "0.01", value: FPS, required: true, "aria-required": "true", title: `기본값은 스토리보드에 적힌 ${SB_META.fps}입니다`,
+        onchange: (e) => { const v = +e.target.value; if (v > 0 && v <= 120) { FPS = v; paintStats3(); paintRows3(); } else e.target.value = FPS; } }), h("span", {}, "러닝타임 FPS")),
+      h("div", { id: "st3b", style: "display:contents" }),
+      h("button", { class: "btn primary", id: "build3", style: "margin-left:auto;align-self:center", disabled: true, onclick: () => { S.g3 = true; S.built = false; runBuild(); } }, "확정하고 시트 만들기")),
     h("div", {}, h("div", { class: "filters", id: "fl3", role: "group", "aria-label": "보기" }),
       h("div", { class: "scroll" }, h("div", { class: "list", style: "min-width:1700px" }, headRow3(), h("div", { id: "rows3" })))),
     h("datalist", { id: "cutIds" }, ...S.D.cuts.map((x) => h("option", { value: x.id })))));
@@ -986,7 +990,7 @@ const sortHead3 = (k, label) => {
   return h("span", { "aria-sort": on ? (S.sort3.d > 0 ? "ascending" : "descending") : "none" },
     h("button", { class: "sortb", "aria-pressed": on, title: label + " 정렬", onclick: () => { S.sort3 = on ? (S.sort3.d > 0 ? { k, d: -1 } : { k: null, d: 1 }) : { k, d: 1 }; $("#lh3").replaceWith(headRow3()); paintRows3(); } }, label, h("span", { "aria-hidden": "true" }, arrow)));
 };
-const headRow3 = () => h("div", { class: "lh w3", id: "lh3" }, sortHead3("id", "CUT"), ...["THUMBNAIL", "Cam Move", "Same Camera", "Sec", "Frame", "Start Frame", "End Frame", "BG", "CH", "PR", "CH_Count", "Dialogue", "Description"].map((t) => h("span", {}, t)));
+const headRow3 = () => h("div", { class: "lh w3", id: "lh3" }, sortHead3("id", "CUT"), ...["THUMBNAIL", "Cam Move", "Same Camera", "Sec", "Frame", "Start Frame", "End Frame", "BG", "CH", "PR", "CH Count", "Dialogue", "Description"].map((t) => h("span", {}, t)));
 function paintFilters3() {
   const D = S.D, fl = $("#fl3"); fl.replaceChildren();
   [["all", `전체 ${D.cuts.reduce((a, c) => a + c.split, 0)}`], ["dup", `동일 연출 확인 필요 ${D.cuts.filter((c) => c.dup && !c.reviewed).length}건`], ["split", `분할 ${D.cuts.filter((c) => c.split > 1).length}건`]]
@@ -1064,11 +1068,12 @@ function row3(c) { // CUT 하나를 분할 칸 수만큼의 시트 행으로 그
 }
 function refresh3() { paintFilters3(); paintRows3(); paintStats3(); renderSteps(); }
 function paintStats3() {
-  const t = totals(), n = need3().length, box = $("#stats3"); if (!box) return; box.replaceChildren();
+  const t = totals(), n = need3().length, a = $("#st3a"), box = $("#st3b"); if (!box) return;
   const s = (v, l) => h("div", {}, h("b", {}, v), h("span", {}, l));
-  box.append(s(fmt(t.cuts), "컷"), s(fmt(PO.reduce((a, id) => a + P[id].length, 0)), "SHOT"), s(fmt(t.frames), "총 Frame"), s(fmt(t.secs) + "초", `총 러닝타임(초), ${FPS}FPS`), s((t.secs / 60).toFixed(1) + "분", "총 러닝타임(분)"));
+  a.replaceChildren(s(fmt(t.cuts), "컷"), s(fmt(PO.reduce((a, id) => a + P[id].length, 0)), "SHOT"), s(fmt(t.frames), "총 Frame"));
+  box.replaceChildren(s(fmt(t.secs) + "초", "총 러닝타임(초)"), s((t.secs / 60).toFixed(1) + "분", "총 러닝타임(분)"));
   const lc = lenCheck(t), d = Math.round(Math.abs(lc.diff) * 10) / 10; // 1단계에서 받은 방영 길이(분)와 총 러닝타임을 0.1분 단위로 견준다
-  box.append(h("p", { class: "muted", style: "grid-column:1/-1;margin:6px 0 0;font-size:13px" }, !lc.hasRt ? "1단계에서 방영 길이를 입력하면 목표 방영 시간과 비교합니다." : d === 0 ? `목표 방영 시간 ${lc.rt}분과 같습니다.` : `목표 방영 시간 ${lc.rt}분 대비 ${d}분 ${lc.diff > 0 ? "초과합니다." : "부족합니다."}`));
+  box.append(h("p", { class: "muted", style: "margin:0;font-size:13px;align-self:center" }, !lc.hasRt ? "1단계에서 방영 길이를 입력하면 목표 방영 시간과 비교합니다." : d === 0 ? `목표 방영 시간 ${lc.rt}분과 같습니다.` : `목표 방영 시간 ${lc.rt}분 대비 ${d}분 ${lc.diff > 0 ? "초과합니다." : "부족합니다."}`));
   const bb = $("#build3"); if (bb) bb.disabled = n !== 0 || !listsOk();
   setBar(n !== 0 ? `분할 제안과 동일 연출 ${n}건을 확인하면 시트를 만들 수 있습니다.` : !listsOk() ? "드롭다운 목록에 빈 목록이 있습니다. 항목을 하나 이상 넣어 주세요." : `확인할 제안이 모두 끝났습니다. 추정 Frame ${fmt(t.est)}행은 노란색으로 시트에 남고, 요약에도 '추정 포함'으로 적힙니다. 확정하면 Google Sheet를 새로 만듭니다. 기존 시트를 덮어쓰지 않습니다.`);
 }
@@ -1077,7 +1082,7 @@ function paintStats3() {
 const BUILD_STEPS = ["컷 목록 조립", "THUMBNAIL 삽입", "드롭다운과 요약 탭 만들기", "Google Sheet로 변환해 Drive에 저장", "검증 실행"];
 /* 로컬: 01_산출 xlsx의 'Google Sheets에서 열기' 링크. 데스크톱 앱이 Drive에 올려야 생기므로 5초마다 2분 동안 다시 묻는다 */
 async function pollSheetLink(n = 24) {
-  const id = curSheetId(); if (!LOCAL || !id.startsWith("L") || S.sheetUrl && S.sheetUrl.id === id) return;
+  const id = curSheetId(); if (!LOCAL || !id || S.sheetUrl && S.sheetUrl.id === id) return;
   let url = ""; try { url = (await (await window.claude.use("mcp")).callTool("Worksheet", "sheet_link", { fileId: id }, { cache: false })).payload.url; } catch (e) {}
   if (curSheetId() !== id) return;
   S.sheetUrl = { id, url, wait: !url && n > 0 };
@@ -1133,11 +1138,12 @@ function renderResult() {
   p.append(h("div", { class: "card big" },
       h("div", { class: "row" }, h("h2", {}, made ? "시트를 만들었습니다" : so ? "시트를 만들지 못했습니다" : "시트를 만들 준비가 끝났습니다"), so && so.err ? null : h("span", { class: "tag " + (allOk ? "pass" : "warn") }, allOk ? `검증 ${checks.length}/${checks.length}` : "확인 필요")),
       so && so.err ? h("div", { class: "note", role: "status" }, so.err) : null,
-      made ? h("dl", { class: "kv" }, ...kv("시트 파일", h("a", { class: "link", href: so.viewUrl, target: "_blank", rel: "noopener" }, so.title))) : null,
-      made ? h("div", { class: "stack", style: "gap:6px" }, h("div", { class: "row" }, sheetLinkEl()), h("p", { class: "muted", style: "font-size:12px;margin:0" }, "작업자는 이 링크에서 바로 편집합니다. 고친 내용은 같은 xlsx에 저장되고, 작업 현황이 그 파일을 읽습니다. ‘Google Sheets로 저장’을 누르면 사본이 따로 생겨 작업 현황에 반영되지 않으니 누르지 않습니다.")) : null,
+      made ? h("dl", { class: "kv" }, ...kv("시트 파일", so.title)) : null,
+      made ? h("div", { class: "stack", style: "gap:6px" }, h("div", { class: "row" }, sheetLinkEl()),
+        h("p", { class: "muted", style: "font-size:12px;margin:0" }, "작업자는 이 링크로 xlsx를 Google Sheets에서 바로 편집합니다. 고친 내용은 xlsx에 자동 저장됩니다. ‘Google Sheets로 저장’을 누르면 사본이 따로 생겨 작업 현황에 보이지 않으니 누르지 않도록 안내해 주세요.")) : null,
       h("div", {}, h("div", { class: "muted", style: "font-size:12px" }, "시트 이름"), h("b", {}, bt),
         bt !== curTitle() ? h("div", { class: "note" }, "화면의 제목을 바꿨지만, 이미 만든 시트의 이름은 바뀌지 않습니다. 시트 이름은 Drive에서 직접 고쳐 주세요.") : null),
-      h("div", { class: "row" }, made ? h("a", { class: "btn", href: so.viewUrl, target: "_blank", rel: "noopener" }, "PC에서 열기") : null, h("button", { class: "btn", onclick: () => go(4) }, "작업 현황 보기"),
+      h("div", { class: "row" }, h("button", { class: "btn", onclick: () => go(4) }, "작업 현황 보기"),
         so && so.err ? h("button", { class: "btn", onclick: runBuildLocal }, "다시 만들기") : null),
       t.est ? h("div", { class: "banner" }, `추정 Frame ${fmt(t.est)}행이 들어 있습니다. 총 러닝타임은 추정을 포함한 값입니다. PD가 고친 Frame만 일반색으로 남습니다.`) : null,
       h("dl", { class: "kv" }, ...kv("저장 위치", folderKv("out", "01_산출")), ...kv("입력 원본", folderKv("inp", "00_입력", " (시나리오, 스토리보드)")), ...kv("작업 기록", folderKv("work", "02_작업", " (cuts.json)"))),
@@ -1173,6 +1179,7 @@ function seg(counts, label) {
 const zero = () => ({ done: 0, prog: 0, fix: 0, asg: 0, wait: 0 });
 function workStats() {
   const W = S.W, byTask = {}, byPerson = {}, mx = {};
+  (W.roster || []).forEach((u) => { byPerson[u] = { all: zero(), tasks: {} }; mx[u] = {}; }); // 시트 요약 탭의 작업자 명단: 아직 맡은 칸이 없어도 보인다
   W.takes.forEach((tk, ti) => { byTask[tk.k] = zero(); W.cells[tk.k].forEach(([s, u]) => {
     const st = stOf(s, u); if (!st) return; byTask[tk.k][st]++;
     if (!u) return; const P = (byPerson[u] = byPerson[u] || { all: zero(), tasks: {} }); P.all[st]++; (P.tasks[tk.k] = P.tasks[tk.k] || zero())[st]++;
@@ -1193,13 +1200,22 @@ function parseSheet(v) {
 }
 const SHEET_ERR = { needs_reauth: "Google Sheets 연결이 만료되었습니다. claude.ai 설정의 커넥터에서 다시 연결해 주세요.", server_not_connected: "Google Sheets 커넥터가 연결되어 있지 않습니다. claude.ai 설정의 커넥터에서 추가해 주세요.",
   not_in_manifest: "이 페이지에서 Google Sheets 사용을 허용하지 않았습니다. 허용하면 시트를 읽을 수 있습니다.", approval_required: "Google Sheets 사용 승인이 필요합니다. 아래 버튼을 눌러 승인해 주세요.", capability_disabled: "이 화면에서는 커넥터를 쓸 수 없습니다.", not_granted: "이 화면에서는 커넥터를 쓸 수 없습니다." };
+/* 요약 탭의 '작업자' 머리글 아래 A열 = 드롭다운에 넣은 작업자 명단(build_worksheet.py). 못 읽으면 빈 명단 */
+async function readRoster(mcp) {
+  try {
+    const v = (await mcp.callTool("Google Sheets", "get_values", { spreadsheetId: curSheetId(), range: "'요약'!A1:A200" }, { cache: false })).payload.values || [];
+    const i = v.findIndex((r) => String(r[0] || "").trim() === "작업자");
+    return i < 0 ? [] : [...new Set(v.slice(i + 1).map((r) => String(r[0] || "").trim()).filter(Boolean))];
+  } catch (e) { return []; }
+}
 async function loadSheetWork() {
   S.wsrc = { kind: "loading" }; if (S.tab === 4) renderDash();
   try {
     const mcp = window.claude && (await window.claude.use("mcp")); if (!mcp) throw { code: "capability_disabled" };
     const r = await mcp.callTool("Google Sheets", "get_values", { spreadsheetId: curSheetId(), range: "A1:AZ400" }, { cache: false });
     const v = r.payload && r.payload.values; if (!v || !v.length) throw { code: "empty", message: "시트에서 값을 받지 못했습니다." };
-    S.W = parseSheet(v); S.wsrc = { kind: "sheet", at: new Date() };
+    if (!S.sheet.title && r.payload.title) { S.sheet.title = r.payload.title; LS.set("wsSheetTitle", r.payload.title); } // 로컬: 링크로 고른 xlsx의 파일 이름
+    S.W = parseSheet(v); S.W.roster = await readRoster(mcp); S.wsrc = { kind: "sheet", at: new Date() };
   } catch (e) { S.W = S.Wdemo; S.wsrc = { kind: "demo", msg: SHEET_ERR[e && e.code] || ("시트를 읽지 못했습니다" + (e && e.message ? ": " + e.message : "") + "."), code: e && e.code }; }
   if (S.tab === 4) renderDash();
 }
@@ -1222,16 +1238,15 @@ function renderDash() {
     return h("div", { class: "pcard" + (live.length ? " active" : "") }, h("div", { class: "row", style: "justify-content:space-between" }, h("b", {}, u), h("span", { class: "muted", style: "font-size:12px" }, `맡은 칸 ${ST.reduce((a, s) => a + all[s[0]], 0)}`)),
       seg(all, u),
       h("div", { class: "now" }, h("span", { class: "muted", style: "font-size:12px" }, "지금 하는 일"),
-        live.length ? live.sort((a, b) => b[1].prog + b[1].fix + b[1].asg - a[1].prog - a[1].fix - a[1].asg).slice(0, 4).map(([k, c]) => h("div", {}, h("b", {}, k), c.prog ? h("span", {}, `진행중 ${c.prog}컷`) : null, c.fix ? h("span", {}, `수정 ${c.fix}컷`) : null, c.asg ? h("span", { class: "muted" }, `배정 ${c.asg}컷`) : null)) : h("span", { class: "muted" }, "진행 중인 작업이 없습니다(모두 완료)")));
+        live.length ? live.sort((a, b) => b[1].prog + b[1].fix + b[1].asg - a[1].prog - a[1].fix - a[1].asg).slice(0, 4).map(([k, c]) => h("div", {}, h("b", {}, k), c.prog ? h("span", {}, `진행중 ${c.prog}컷`) : null, c.fix ? h("span", {}, `수정 ${c.fix}컷`) : null, c.asg ? h("span", { class: "muted" }, `배정 ${c.asg}컷`) : null)) : h("span", { class: "muted" }, ST.some(([k]) => all[k]) ? "진행 중인 작업이 없습니다(모두 완료)" : "아직 맡은 칸이 없습니다")));
   };
   const src = S.wsrc, fromSheet = src.kind === "sheet";
-  const srcBar = h("div", { class: "card stack" },
+  const srcBar = h("div", { class: "card stack", style: "gap:6px;font-size:13px" },
     h("div", { class: "row" }, h("span", { class: "tag " + (fromSheet ? "pass" : "warn") }, fromSheet ? "시트에서 읽음" : "읽지 못함"),
-      h("span", { class: "muted", style: "font-size:12px" }, fromSheet ? `${S.sheet.id ? S.sheet.title || "링크로 고른 시트" : S.builtTitle || curTitle()} · ${src.at.toLocaleTimeString("ko-KR")} 기준` : "")),
-    h("p", { class: "muted measure", style: "font-size:13px" }, fromSheet ? "고른 시트의 공정 열(LO, AN, Render, Comp)을 읽은 값입니다. 작업자가 시트에 상태와 이름을 적으면 다시 읽을 때 현황에 반영됩니다." : (src.msg || "")),
-    LOCAL && fromSheet && curSheetId().startsWith("L") ? h("p", { class: "muted measure", style: "font-size:12px;margin:0" }, "작업자가 Google Sheets에서 고친 내용은 PC로 내려오는 데 1~2분 걸릴 수 있습니다. 반영되지 않았으면 잠시 뒤 다시 읽어 주세요.") : null,
-    h("div", { class: "row" }, h("button", { class: "btn primary", onclick: loadSheetWork }, "시트에서 다시 읽기"), LOCAL && curSheetId().startsWith("L") ? sheetLinkEl() : null));
-  if (LOCAL && curSheetId().startsWith("L") && !(S.sheetUrl && S.sheetUrl.id === curSheetId())) setTimeout(() => pollSheetLink(), 0);
+      h("span", { class: "muted", style: "font-size:12px" }, fromSheet ? `${S.sheet.id ? S.sheet.title || "링크로 고른 시트" : S.builtTitle || curTitle()} · ${src.at.toLocaleTimeString("ko-KR")} 기준` : (src.msg || "")),
+      h("span", { class: "row", style: "margin-left:auto;gap:8px" }, LOCAL ? sheetLinkEl() : null, h("button", { class: "btn", onclick: loadSheetWork }, "다시 읽기"))),
+    fromSheet ? h("span", { class: "muted", style: "font-size:12px" }, LOCAL ? "공정 열(LO, AN, Render, Comp)을 PC에 동기화된 xlsx에서 읽은 값입니다. Google Sheets에서 고친 내용은 1~2분 뒤 다시 읽으면 반영됩니다." : "공정 열(LO, AN, Render, Comp)을 읽은 값입니다. 작업자가 시트를 고치면 다시 읽을 때 반영됩니다.") : null);
+  if (LOCAL && !(S.sheetUrl && S.sheetUrl.id === curSheetId())) setTimeout(() => pollSheetLink(), 0);
   p.append(sheetPicker(), srcBar, chips2,
     h("div", { class: "card dkpi", style: "margin-top:4px" }, kp(fmt(total), "집계한 작업 칸", "--line"), kp(fmt(sum.done) + " (" + Math.round(sum.done / Math.max(total, 1) * 100) + "%)", "완료", "--s-done"), kp(fmt(sum.prog), "진행중", "--s-prog"), kp(fmt(sum.fix), "수정 중", "--s-fix"), kp(fmt(sum.asg), "배정됨(시작 전)", "--s-wait"), kp(fmt(sum.wait), "미배정", "--s-wait")),
     h("div", { class: "card stack", style: "margin-top:16px" }, h("h2", {}, "업무별 현황"), legend,
@@ -1342,28 +1357,14 @@ const folderKv = (k, name, tail) => { const path = rootLabel().replace("/", " / 
 S.sheet = { id: LS.get("wsSheetId") || "", title: LS.get("wsSheetTitle") || "" };
 const curSheetId = () => S.sheet.id || "";
 const pickSheet = (id, title) => { S.sheet = { id, title: title || "" }; LS.set("wsSheetId", id); LS.set("wsSheetTitle", title || ""); S.wsrc = null; renderDash(); };
-async function findSheets() {
-  S.sheets = { busy: true }; renderDash();
-  try {
-    if (!S.root.ok) throw { code: "no_root", message: "작업 폴더를 먼저 연결해 주세요. 위의 Google 연결 설정에서 확인합니다." };
-    const mcp = await useMcp();
-    const r = await mcp.callTool("Google Drive", "search_files", { query: `'${qs(S.root.id)}' in ancestors and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`, pageSize: 50, orderBy: "modifiedTime desc", excludeContentSnippets: true }, { cache: false });
-    S.sheets = { list: ((r.payload && r.payload.files) || []).map((x) => ({ id: x.id, title: x.title })) };
-  } catch (e) { S.sheets = { msg: driveErr(e) }; }
-  renderDash();
-}
 function sheetPicker() {
-  const sh = S.sheets || {}, cur = curSheetId();
+  const sh = S.sheets || {};
   const inp = h("input", { type: "text", placeholder: "https://docs.google.com/spreadsheets/d/…", autocomplete: "off", "aria-label": "워크시트 링크" });
   const fromLink = () => { const m = inp.value.match(/\/d\/([\w-]{20,})/) || inp.value.trim().match(/^([\w-]{20,})$/); if (m) pickSheet(m[1], ""); else { S.sheets = { ...sh, msg: "Google Sheet 링크(…/spreadsheets/d/…)를 붙여 넣어 주세요." }; renderDash(); } };
   inp.onkeydown = (e) => { if (e.key === "Enter") fromLink(); };
-  return h("div", { class: "card stack" }, h("h2", {}, "볼 워크시트"),
-    h("p", { class: "muted measure", style: "font-size:13px" }, "작업 폴더 아래에 있는 Google Sheet를 찾아 고르거나 시트 링크를 붙여 넣습니다. 다른 에피소드의 워크시트도 같은 방법으로 봅니다. 고른 시트는 이 브라우저에 저장되어 다음에 열 때 다시 나옵니다."),
-    h("div", { class: "row" }, h("button", { class: "btn", disabled: !!sh.busy, onclick: findSheets }, sh.busy ? "찾는 중입니다" : "작업 폴더에서 찾기"),
-      sh.list ? (sh.list.length ? h("select", { "aria-label": "워크시트 선택", onchange: (e) => { const o = sh.list.find((x) => x.id === e.target.value); if (o) pickSheet(o.id, o.title); } },
-        h("option", { value: "" }, `시트 ${sh.list.length}개에서 고르기`), ...sh.list.map((x) => h("option", { value: x.id, selected: x.id === cur }, x.title)))
-        : h("span", { class: "muted" }, "작업 폴더 아래에 Google Sheet가 없습니다. xlsx로 올린 파일은 Google Sheet로 변환해야 보입니다.")) : null),
-    h("div", { class: "chk nowrap" }, inp, h("button", { class: "btn", onclick: fromLink }, "링크로 읽기")),
+  return h("div", { class: "card stack shpick", style: "gap:8px;font-size:13px" }, h("b", {}, "볼 워크시트"), // 링크 칸과 버튼은 연결 설정의 폴더 연결과 같은 모양
+    h("div", { class: "chk nowrap" }, inp, h("button", { class: "btn primary", onclick: fromLink }, "링크로 읽기")),
+    h("span", { class: "muted", style: "font-size:12px" }, "Google Sheets 링크를 붙여 넣습니다. 고른 시트는 이 브라우저에 저장됩니다."),
     sh.msg ? h("div", { class: "note", role: "status" }, sh.msg) : null);
 }
 function connMsg(name, e) {

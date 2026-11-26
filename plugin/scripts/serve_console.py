@@ -53,7 +53,7 @@ def drive_status():
 
 
 def drive_path(fid):
-    """Drive 폴더 id → PC 경로. 데스크톱 앱의 메타데이터 DB(items·stable_parents)로 상위 폴더 이름을 따라 올라간다.
+    """Drive 폴더·파일 id → PC 경로. 데스크톱 앱의 메타데이터 DB(items·stable_parents)로 상위 폴더 이름을 따라 올라간다.
     ponytail: Google이 공개하지 않은 DB 형식이다. 앱이 바꾸면 None이 되고, 콘솔은 폴더를 찾지 못했다고 알린다."""
     mount = drive_mount()
     if not mount or not DRIVEFS.is_dir():
@@ -76,7 +76,7 @@ def drive_path(fid):
             continue
         parts.reverse()  # 맨 앞은 '내 드라이브'이거나 공유 드라이브 이름
         for p in (mount.joinpath(*parts), mount.joinpath("공유 드라이브", *parts), mount.joinpath("Shared drives", *parts)):
-            if parts and p.is_dir():
+            if parts and p.exists():
                 return p.resolve()
     return None
 
@@ -112,17 +112,21 @@ def drive_file_id(p):
 def sheet_link(inp, roots):
     """콘솔 결과 화면·작업 현황의 'Google Sheets에서 열기': 01_산출의 xlsx를 Drive에서 Google Sheets로 바로 편집하는 링크.
     편집한 내용은 같은 xlsx에 저장되고, 데스크톱 앱이 PC로 내려받으면 작업 현황이 읽는다. 아직 올라가지 않았으면 url이 비어 있다."""
-    p = from_id(inp.get("fileId"), roots)
+    i = inp.get("fileId", "")
+    if i and not i.startswith("L"):  # Drive id: Google Sheet는 그대로, xlsx는 Office 호환 모드로 연다
+        p = drive_path(i)
+        return {"url": f"https://docs.google.com/spreadsheets/d/{i}/edit" + ("?rtpof=true&sd=true" if p and p.suffix.lower() == ".xlsx" else ""), "inDrive": True}
+    p = from_id(i, roots)
     fid = drive_file_id(p)
     return {"url": f"https://docs.google.com/spreadsheets/d/{fid}/edit?rtpof=true&sd=true" if fid else "", "inDrive": bool(drive_mount() and drive_mount().resolve() in p.parents)}
 
 
 def from_id(i, roots):
-    if i and not i.startswith("L") and re.fullmatch(r"[\w-]{10,}", i):  # Drive 폴더 id: 데스크톱 앱 폴더로 바꾸고, 연결한 폴더로 허용한다
+    if i and not i.startswith("L") and re.fullmatch(r"[\w-]{10,}", i):  # Drive id: 데스크톱 앱 경로로 바꾼다. 폴더는 연결한 폴더로 허용한다
         p = drive_path(i)
         if not p:
-            raise Fail("not_found", "Google Drive 데스크톱 앱에서 이 폴더를 찾지 못했습니다. 앱에 로그인했는지, 폴더가 내 드라이브나 공유 드라이브에 있는지 확인해 주세요.", 404)
-        if p not in roots:
+            raise Fail("not_found", "Google Drive 데스크톱 앱에서 이 항목을 찾지 못했습니다. 앱에 로그인했는지, 내 드라이브나 공유 드라이브에 있는지 확인해 주세요.", 404)
+        if p.is_dir() and p not in roots:
             roots.append(p)
         return p
     if not i or not i.startswith("L"):
@@ -223,15 +227,17 @@ def build_sheet(inp, roots):
 
 
 def get_values(inp, roots):
-    sid = inp.get("spreadsheetId", "")
-    if not sid.startswith("L"):  # 시연용 Google Sheet id: 로컬에는 없다
-        return {"values": []}
+    """작업 현황: 작업자가 Google Sheets(Office 호환 모드)에서 고친 xlsx를 Drive 데스크톱 앱의 PC 사본으로 읽는다."""
+    p = from_id(inp.get("spreadsheetId", ""), roots)
+    if p.suffix.lower() != ".xlsx":
+        raise Fail("invalid_argument", "xlsx 워크시트만 읽을 수 있습니다. 콘솔이 만든 xlsx의 Google Sheets 링크를 붙여 넣어 주세요. ‘Google Sheets로 저장’으로 만든 사본은 읽지 못합니다.")
     import openpyxl
-    ws = openpyxl.load_workbook(from_id(sid, roots), read_only=True, data_only=True).worksheets[0]
+    wb, tab = openpyxl.load_workbook(p, read_only=True, data_only=True), inp.get("range", "").rpartition("!")[0].strip("'")
+    ws = wb[tab] if tab in wb.sheetnames else wb.worksheets[0]  # range의 탭 이름('요약'!A1:A200)만 따르고 칸 범위는 무시한다
     rows = [["" if c is None else c for c in r] for r in ws.iter_rows(values_only=True)]
     while rows and not any(str(c).strip() for c in rows[-1]):
         rows.pop()
-    return {"values": [[str(c) if not isinstance(c, (int, float)) else c for c in r] for r in rows[:400]]}
+    return {"values": [[str(c) if not isinstance(c, (int, float)) else c for c in r] for r in rows[:400]], "title": p.name}
 
 
 def gen_scenario(path):
