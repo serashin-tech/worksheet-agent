@@ -221,7 +221,7 @@ def build_sheet(inp, roots):
     b = run(HERE / "build_worksheet.py", docx[-1], tmp / "thumbs", "-", tmp / "out.xlsx", "--overrides", tmp / "o.json", "--asset-images", tmp / "aimg", *r.stdout.split())
     if b.returncode:
         raise Fail("build_error", "시트를 조립하지 못했습니다: " + (b.stderr.strip().splitlines() or [""])[-1], 500)
-    v = run(HERE / "verify_worksheet.py", tmp / "out.xlsx")
+    v = run(HERE / "verify_worksheet.py", tmp / "out.xlsx", tmp / "out.summary.json")  # 요약 파일까지 넘겨야 목표 컷 수·러닝타임·FPS도 검증한다
     checks = [{"ok": ln.startswith("PASS"), "text": ln[5:]} for ln in v.stdout.splitlines() if ln.startswith(("PASS ", "FAIL "))]
     return {**meta(publish(cuts, tmp / "out.xlsx", out_dir)), "checks": checks}
 
