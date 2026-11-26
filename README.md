@@ -6,53 +6,148 @@
 
 ## 설치
 
-저장소가 비공개(`serashin-tech/worksheet-agent`)라서 설치하는 PC의 GitHub 계정에 읽기 권한이 있어야 합니다. 먼저 `gh auth login`으로 로그인합니다.
+처음 쓰는 PC는 아래 1~4를 순서대로 한 번만 하면 됩니다. 예시는 프로젝트 폴더를 `D:\ToastWorksheet`로 둡니다. 다른 드라이브나 이름을 써도 되며, 그때는 명령의 경로를 같이 바꿉니다.
 
-### 공통 준비
+### 준비물
 
-1. **Python 3.11 이상**과 스크립트가 쓰는 패키지를 설치합니다.
+| 항목 | 용도 | 확인 방법 |
+|---|---|---|
+| Windows 10·11 | 스토리보드 PDF는 글자 층이 없는 그림이라 Windows 내장 한국어 OCR(`ocr_win.ps1`)로 읽습니다 | 설정 → 시간 및 언어 → 언어에 한국어가 있는지 |
+| Git | 저장소 내려받기와 갱신 | `git --version` |
+| Python 3.11 이상 | 파싱·계산·조립 스크립트 | `python --version` |
+| Claude Code 또는 Codex | 플러그인 실행 | `claude --version` 또는 `codex --version` |
+| GitHub 계정 | 저장소가 비공개(`serashin-tech/worksheet-agent`)라서 읽기 권한이 있는 계정이 필요합니다 | 저장소 주소가 브라우저에서 열리는지 |
 
-   ```
-   pip install openpyxl numpy pymupdf pillow python-docx python-pptx
-   ```
+### 1. 로컬 드라이브에 프로젝트 폴더 만들기
 
-2. **Google Drive·Google Sheets 커넥터**를 연결합니다. 플러그인은 작업 폴더를 찾고, 입력 파일을 내려받고, 완성한 시트를 올릴 때 이 커넥터를 씁니다.
-3. **Windows**에서 씁니다. 스토리보드 PDF는 글자 층이 없는 그림이라 Windows 내장 한국어 OCR(`ocr_win.ps1`)로 읽습니다.
-4. 스토리보드 PDF가 7MB를 넘으면 커넥터로 받지 못합니다. 이때는 PC의 Google Drive 동기화 폴더에서 원본을 읽으므로 Google Drive for desktop이 설치되어 있어야 합니다([ADR 0006](docs/adr/0006-original-pdf-via-sync-folder.md)).
+PowerShell을 열고 프로젝트 폴더를 만든 뒤, 그 안에 저장소를 내려받습니다.
 
-### Claude Code
+```powershell
+New-Item -ItemType Directory -Force D:\ToastWorksheet
+cd D:\ToastWorksheet
+gh auth login
+git clone https://github.com/serashin-tech/worksheet-agent.git
+```
+
+- `gh`가 없으면 `git clone`을 실행할 때 뜨는 GitHub 로그인 창으로 로그인해도 됩니다.
+- Git을 쓰지 않는다면 브라우저에서 저장소를 열고 **Code → Download ZIP**으로 받은 뒤, 압축을 `D:\ToastWorksheet\worksheet-agent`에 풉니다. 이 경우 새 버전도 ZIP을 다시 받아 덮어씁니다.
+
+이어서 스크립트가 쓰는 Python 패키지를 설치합니다.
+
+```powershell
+pip install openpyxl numpy pymupdf pillow python-docx python-pptx
+```
+
+다 끝나면 폴더가 이렇게 됩니다.
 
 ```
-claude plugin marketplace add serashin-tech/worksheet-agent
+D:\ToastWorksheet\
+  worksheet-agent\          내려받은 저장소(플러그인 원본)
+    .claude-plugin\         Claude Code 마켓플레이스
+    .agents\plugins\        Codex 마켓플레이스
+    plugin\                 스킬·스크립트·콘솔
+```
+
+Claude Code나 Codex는 늘 `D:\ToastWorksheet`에서 실행합니다. 작업 결과(시트, `cuts.json`)는 이 폴더가 아니라 Google Drive 작업 폴더에 저장됩니다.
+
+### 2. Google 연결: 커넥터와 Google Drive 데스크톱 앱
+
+플러그인은 Google Drive를 두 경로로 씁니다.
+
+| 경로 | 쓰는 곳 | 필요 여부 |
+|---|---|---|
+| **Google Drive 데스크톱 앱** | 로컬 콘솔이 작업 폴더·에셋 폴더를 PC 경로(`G:\…`)로 읽고 씁니다. 스토리보드 PDF는 대개 10MB를 넘어 커넥터로 주고받지 못하기 때문입니다([ADR 0006](docs/adr/0006-original-pdf-via-sync-folder.md)) | Claude Code·Codex 모두 **필수** |
+| **Google Drive·Google Sheets 커넥터(MCP)** | Claude Code가 Drive 폴더를 찾고 완성한 시트를 Google Sheet로 올립니다 | Claude Code에서 권장. Codex는 쓰지 않습니다(로컬 모드) |
+
+#### 2-1. Google Drive 데스크톱 앱 설치
+
+1. [Google Drive 데스크톱 다운로드 페이지](https://www.google.com/drive/download/)에서 설치 파일을 받아 설치합니다.
+2. 실행하면 뜨는 로그인 창에서 **회사 Google 계정**으로 로그인합니다. 작업 폴더와 에셋 폴더에 권한이 있는 계정이어야 합니다.
+3. 작업 표시줄의 Drive 아이콘 → 톱니바퀴 → **환경설정 → Google Drive**에서 **파일 스트리밍**을 고릅니다. 드라이브 문자는 기본값 `G:`를 그대로 둡니다.
+4. 파일 탐색기에서 `G:\내 드라이브`와 `G:\공유 드라이브`가 보이는지 확인합니다.
+5. 작업 폴더가 **공유 문서함**에만 있으면 G:에 나타나지 않습니다. 웹 Drive에서 그 폴더를 오른쪽 클릭 → **정리 → 바로가기 추가**로 내 드라이브에 바로가기를 만듭니다.
+
+#### 2-2. Claude Code에 Google 커넥터 연결
+
+Claude Code의 Google 커넥터는 claude.ai 계정 설정에서 연결하고, 같은 계정으로 로그인한 Claude Code가 그대로 가져다 씁니다.
+
+1. 브라우저에서 [claude.ai](https://claude.ai)에 로그인하고 **설정 → 커넥터**로 갑니다.
+2. **Google Drive**를 찾아 **연결**을 누르고, 회사 Google 계정으로 권한을 허용합니다.
+3. **Google Sheets**도 같은 방법으로 연결합니다.
+4. Claude Code가 같은 claude.ai 계정으로 로그인되어 있는지 확인합니다(`claude` 실행 후 `/status`). 다른 계정이면 `/login`으로 다시 로그인합니다.
+5. Claude Code에서 `/mcp`를 입력해 Google Drive와 Google Sheets가 연결됨으로 나오는지 봅니다.
+
+Codex에는 이 단계가 없습니다. Codex에서는 `worksheet-build`가 로컬 모드로 동작해 `01_산출`에 xlsx를 만들고, 데스크톱 앱이 그 파일을 Drive에 올립니다.
+
+### 3. 플러그인 설치
+
+1에서 내려받은 폴더를 마켓플레이스로 등록하고 플러그인을 설치합니다.
+
+#### Claude Code
+
+```powershell
+claude plugin marketplace add D:\ToastWorksheet\worksheet-agent
 claude plugin install worksheet-agent@worksheet-agent
 ```
 
-Claude Code 안에서는 `/plugin marketplace add serashin-tech/worksheet-agent`와 `/plugin install worksheet-agent@worksheet-agent`로도 설치할 수 있습니다. 새 버전은 `claude plugin marketplace update worksheet-agent`로 받습니다.
+- Claude Code 안에서는 `/plugin marketplace add D:\ToastWorksheet\worksheet-agent`와 `/plugin install worksheet-agent@worksheet-agent`로도 설치할 수 있습니다.
+- 설치 뒤 Claude Code를 다시 열고 `/plugin`에서 `worksheet-agent`가 켜져 있는지 확인합니다.
+- 새 버전은 저장소 폴더에서 `git pull`을 실행한 뒤 `claude plugin marketplace update worksheet-agent`와 `claude plugin update worksheet-agent@worksheet-agent`로 받습니다.
 
-### Codex
+#### Codex
 
-```
-codex plugin marketplace add serashin-tech/worksheet-agent
+```powershell
+codex plugin marketplace add D:\ToastWorksheet\worksheet-agent
 codex plugin add worksheet-agent@worksheet-agent
 ```
 
-Codex는 시작할 때 Git 마켓플레이스를 새로 읽습니다. 바로 갱신하려면 `codex plugin marketplace upgrade worksheet-agent`를 실행하고 새 세션을 엽니다.
-
-### 콘솔
-
-PD가 쓰는 화면은 claude.ai에 Artifact로 게시한 **Worksheet 콘솔**입니다. 원본은 `plugin/console/console.html`입니다. 처음 열 때 Google Drive·Google Sheets 사용을 승인해야 폴더와 시트를 읽고 저장할 수 있습니다.
-
-Claude Code와 Codex에서는 같은 콘솔을 로컬 사이트로 엽니다. Google 커넥터는 파일 하나를 10MB까지만 주고받는데 스토리보드 PDF는 대개 그보다 크기 때문입니다. 이 방식에는 **Google Drive 데스크톱 앱**이 필요합니다. "워크시트 콘솔 띄워 줘"라고 하면 `worksheet-console` 스킬이 Claude Code의 커넥터를 확인한 뒤 아래 명령으로 서버를 띄웁니다.
-
-```
-python -I plugin/scripts/serve_console.py --connectors "Google Drive,Google Sheets"
-```
-
-- 주소는 `http://127.0.0.1:8765/`입니다. 서버는 이 PC에서만 열립니다.
-- 콘솔의 폴더 칸에는 Drive 폴더 주소(`https://drive.google.com/drive/folders/…`)를 붙여 넣습니다. 서버가 데스크톱 앱의 메타데이터 DB에서 그 폴더의 PC 경로(`G:\내 드라이브\…`, `G:\공유 드라이브\…`)를 찾고, 연결한 폴더 안에서만 읽고 씁니다. 저장한 파일은 데스크톱 앱이 Drive에 올립니다.
-- 메타데이터 DB는 Google이 공개한 형식이 아닙니다. 앱이 바뀌어 폴더를 찾지 못하면 `--root "<PC 폴더>"`로 폴더를 직접 넘깁니다.
-- 시연 데이터 없이 시작합니다. PD가 시나리오를 올리면 컷 목록을, 스토리보드 PDF를 올리면 썸네일·칸·대사(OCR, Windows)를 서버가 만들어 화면에 채웁니다. 미리 만든 시연 데이터(`cuts.json·thumbs.json·panels.json·work.json`)로 보여 줄 때만 `--data "<폴더>"`를 붙입니다.
+- `codex plugin list`에서 `worksheet-agent`가 설치됨으로 나오는지 확인하고 새 세션을 엽니다.
+- 새 버전은 저장소 폴더에서 `git pull`을 실행한 뒤 `codex plugin add worksheet-agent@worksheet-agent`를 다시 실행하고 새 세션을 엽니다.
 - Codex의 샌드박스가 `workspace-write`이면 Python 실행이 막힐 수 있습니다. 이때는 스크립트 실행을 승인하거나 샌드박스를 넓힙니다.
+
+> 저장소를 내려받지 않고 GitHub에서 바로 설치할 수도 있습니다. 마켓플레이스 경로 자리에 `serashin-tech/worksheet-agent`를 넣으면 됩니다(`claude plugin marketplace add serashin-tech/worksheet-agent`, `codex plugin marketplace add serashin-tech/worksheet-agent`). 다만 이 방식에서는 아래 4의 "직접 띄우기"에 쓸 로컬 스크립트 경로가 없습니다.
+
+### 4. Worksheet 콘솔 호출
+
+PD가 쓰는 화면은 **Worksheet 콘솔**입니다. 원본은 `plugin/console/console.html`이며, Claude Code와 Codex에서는 이 콘솔을 PC의 로컬 사이트로 엽니다.
+
+1. PowerShell에서 프로젝트 폴더로 가서 Claude Code나 Codex를 실행합니다.
+
+   ```powershell
+   cd D:\ToastWorksheet
+   claude
+   ```
+
+   Codex라면 마지막 줄을 `codex`로 바꿉니다.
+2. 대화창에 이렇게 입력합니다.
+
+   ```
+   워크시트 콘솔 띄워 줘
+   ```
+
+   `worksheet-console` 스킬이 커넥터 연결을 확인한 뒤 서버를 띄웁니다. 스킬 이름으로 직접 부르려면 Claude Code에서는 `/worksheet-agent:worksheet-console`, Codex에서는 `$worksheet-console`을 입력합니다.
+3. 브라우저가 `http://127.0.0.1:8765/`로 열립니다. 열리지 않으면 이 주소를 직접 입력합니다. 서버는 이 PC에서만 열립니다.
+4. 콘솔의 **Google 연결 설정**에서 다음을 확인합니다.
+   - 1단계: Google Drive·Google Sheets 커넥터와 Google Drive 데스크톱 앱이 "연결됨"인지 봅니다. 커넥터가 "연결 안 됨"이면 2-2를 마친 뒤 "워크시트 콘솔 다시 띄워 줘"라고 말합니다. Codex에서는 커넥터가 "확인 안 함"으로 나오며 그대로 써도 됩니다.
+   - 2단계: 작업 폴더의 Drive 주소(`https://drive.google.com/drive/folders/…`)를 붙여 넣고 **폴더 연결**을 누릅니다. 서버가 데스크톱 앱에서 그 폴더의 PC 경로(`G:\내 드라이브\…`, `G:\공유 드라이브\…`)를 찾고, 연결한 폴더 안에서만 읽고 씁니다.
+5. 다 쓰면 "콘솔 닫아 줘"라고 말해 서버를 멈춥니다.
+
+#### 직접 띄우기
+
+스킬을 거치지 않고 PowerShell에서 바로 띄울 수도 있습니다.
+
+```powershell
+python -I D:\ToastWorksheet\worksheet-agent\plugin\scripts\serve_console.py --connectors "Google Drive,Google Sheets"
+```
+
+- `--connectors`에는 연결된 커넥터 이름만 넣습니다. Codex처럼 커넥터가 없으면 이 옵션을 뺍니다.
+- 포트 8765가 이미 쓰이고 있으면 `--port 8766`을 붙입니다.
+- 데스크톱 앱의 메타데이터 DB는 Google이 공개한 형식이 아니라서, 앱이 바뀌면 폴더를 찾지 못할 수 있습니다. 이때는 `--root "<PC 폴더>"`로 폴더를 직접 넘깁니다.
+- 시연 데이터 없이 시작합니다. PD가 시나리오를 올리면 컷 목록을, 스토리보드 PDF를 올리면 썸네일·칸·대사(OCR)를 서버가 만듭니다(스토리보드는 1~2분). 미리 만든 시연 데이터(`cuts.json·thumbs.json·panels.json·work.json`)로 보여 줄 때만 `--data "<폴더>"`를 붙입니다.
+
+#### claude.ai Artifact 콘솔
+
+같은 콘솔을 claude.ai에 Artifact로 게시해 브라우저에서 바로 쓸 수도 있습니다. 처음 열 때 Google Drive·Google Sheets 사용을 승인해야 폴더와 시트를 읽고 저장할 수 있습니다. 다만 커넥터는 파일 하나를 10MB까지만 주고받으므로, 큰 스토리보드는 로컬 콘솔에서 다룹니다.
 
 ## 사용법
 
