@@ -22,7 +22,7 @@ description: 콘솔에서 확정한 에피소드의 Worksheet xlsx를 만들어 
 
 1. `download_file_content`로 `cuts.json`과 `00_입력`의 시나리오(docx)를 받는다.
 2. 스토리보드 PDF가 7MB를 넘으면 커넥터로 받지 못한다(ADR 0006). PD PC의 Drive 동기화 폴더(`G:\`)에서 같은 경로의 파일을 쓴다. 찾지 못하면 PD에게 로컬 경로를 묻는다.
-3. 에셋은 콘솔 3단계에서 확정한 목록(`cuts.json`의 `assets`)을 쓴다. 에셋마다 `fileId`를 `download_file_content`로 받아 새 빈 폴더 `aimg/`에 `<code>.<확장자>`(png·jpg·jpeg·webp)로 저장한다. 7MB가 넘는 파일은 건너뛰고 PD에게 코드를 알린다(그 칸은 비어서 올라간다). `fileId`가 없는 에셋(손으로 더한 에셋)은 이미지 없이 둔다.
+3. 에셋은 콘솔 3단계에서 확정한 목록(`cuts.json`의 `assets`)을 쓴다. 에셋에 `img`(PD가 콘솔에서 바꾼 이미지, PNG base64)가 있으면 그것을 `aimg/<code>.png`로 쓴다. 없으면 `fileId`를 `download_file_content`로 받아 새 빈 폴더 `aimg/`에 `<code>.<확장자>`(png·jpg·jpeg·webp)로 저장한다. 7MB가 넘는 파일은 건너뛰고 PD에게 코드를 알린다(그 칸은 비어서 올라간다). `fileId`가 없는 에셋(손으로 더한 에셋)은 이미지 없이 둔다.
 4. `assets`가 없는 옛 `cuts.json`이면 PD에게 에셋 목록 xlsx(EP12는 정답 시트의 Asset 탭) 경로를 받는다. 이때 Asset 탭은 그 xlsx를 복사하고, BG·CH·PR 열은 시나리오에서 다시 도출한다.
 
 ## 3. 조립과 검증
@@ -61,7 +61,7 @@ Claude Code·Codex에서는 콘솔을 `worksheet-console` 스킬로 띄워 쓴�
 
 1. 작업 폴더의 PC 경로와 애니메이션명·에피소드 번호를 정한다. PD가 Drive 주소를 주면 `serve_console.py`의 `drive_path(<폴더 id>)`로 PC 경로를 찾는다. 에피소드 폴더는 `<작업 폴더>\<애니메이션명>\EP12\`다.
 2. `02_작업\cuts.json`, `00_입력`의 시나리오와 스토리보드를 그 자리에서 읽는다. 내려받기와 7MB 한도는 없다.
-3. 렌더 이미지는 이렇게 모은다. 콘솔이 에셋 파일의 PC 경로를 `fileId`에 넣어 두었다.
+3. 렌더 이미지는 이렇게 모은다. 콘솔이 에셋 파일의 PC 경로를 `fileId`에 넣어 두었고, PD가 바꾼 이미지는 `img`에 있다. 스크립트가 `img`를 먼저 쓴다.
    ```
    python -I serve_console.py --export-images <cuts.json> <aimg폴더>
    ```

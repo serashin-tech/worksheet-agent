@@ -149,6 +149,16 @@ def create_file(inp, roots):
     return meta(p)
 
 
+def replace_file(inp, roots):
+    """콘솔 3단계 '이미지 바꾸기': 연결한 폴더 안의 기존 그림 파일을 새 내용으로 덮어쓴다. 새 파일은 만들지 않는다.
+    Google Drive 데스크톱 앱이 올리면 Drive의 버전 기록에 이전 파일이 남는다."""
+    p = from_id(inp.get("fileId"), roots)
+    if not p.is_file() or p.suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp"):
+        raise Fail("invalid_argument", f"바꿀 수 있는 그림 파일이 아닙니다: {p.name}")
+    p.write_bytes(base64.b64decode(inp.get("base64Content") or ""))
+    return meta(p)
+
+
 def get_values(inp, roots):
     sid = inp.get("spreadsheetId", "")
     if not sid.startswith("L"):  # 시연용 Google Sheet id: 로컬에는 없다
@@ -199,7 +209,7 @@ def gen_storyboard(path):
 GEN = {"scenario": gen_scenario, "storyboard": gen_storyboard}
 
 
-TOOLS = {("Google Drive", "search_files"): search_files, ("Google Drive", "create_file"): create_file, ("Google Sheets", "get_values"): get_values}
+TOOLS = {("Google Drive", "search_files"): search_files, ("Google Drive", "create_file"): create_file, ("Google Drive", "replace_file"): replace_file, ("Google Sheets", "get_values"): get_values}
 
 
 def handler(roots, data, connectors):
@@ -217,6 +227,15 @@ def handler(roots, data, connectors):
                 return self.send(200, (HEAD + (CONSOLE / "console.html").read_text(encoding="utf-8") + "</body></html>").encode(), "text/html; charset=utf-8")
             if u.path == "/status":  # 연결 설정 1단계: Claude Code가 확인한 커넥터와 데스크톱 앱 상태
                 return self.send(200, {"drive": drive_status(), "connectors": connectors})
+            if u.path == "/img":  # 콘솔 3단계 에셋 목록의 이미지: 연결한 폴더 안의 그림 파일만 준다
+                try:
+                    p = from_id(parse_qs(u.query).get("id", [""])[0], roots)
+                    ct = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}.get(p.suffix.lower())
+                    if not ct or not p.is_file():
+                        raise Fail("not_found", "그림 파일이 아닙니다.", 404)
+                    return self.send(200, p.read_bytes(), ct)
+                except Fail as e:
+                    return self.send(e.status, {"code": e.code, "message": str(e)})
             if u.path == "/open":  # 콘솔의 폴더·파일 링크: 탐색기나 연결된 앱으로 연다
                 try:
                     os.startfile(from_id(parse_qs(u.query).get("id", [""])[0], roots))  # noqa: Windows 전용
@@ -266,12 +285,16 @@ def handler(roots, data, connectors):
 
 
 def export_images(cuts, out):
-    """cuts.json의 assets에서 로컬 id(L…)를 가진 에셋 이미지를 out/<code>.<ext>로 복사한다. 손으로 더한 에셋(fileId 없음)은 건너뛴다."""
+    """cuts.json의 assets에서 에셋 이미지를 out/<code>.<ext>로 모은다. PD가 콘솔에서 바꾼 이미지(img, PNG base64)가 있으면 그것을 쓰고,
+    없으면 로컬 id(L…)의 파일을 복사한다. 둘 다 없는 에셋(손으로 더하고 이미지를 넣지 않은 것)은 건너뛴다."""
     import shutil
     out = pathlib.Path(out); out.mkdir(parents=True, exist_ok=True)
     n = 0
     for v in (json.loads(pathlib.Path(cuts).read_text(encoding="utf-8")).get("assets") or {}).values():
         for a in v:
+            if a.get("img"):
+                (out / f"{a['code']}.png").write_bytes(base64.b64decode(a["img"])); n += 1
+                continue
             i = a.get("fileId") or ""
             if not i.startswith("L"):
                 continue
@@ -313,9 +336,9 @@ def self_check(tmp):
         pass
     assert get_values({"spreadsheetId": "1AYqLq2Fn7e3cWHoiK9"}, roots) == {"values": []}
     img = root / "Pororo.png"; img.write_bytes(b"x")
-    (root / "c.json").write_text(json.dumps({"assets": {"CH": [{"code": "Pororo", "fileId": to_id(img)}, {"code": "Hand"}]}}), encoding="utf-8")
+    (root / "c.json").write_text(json.dumps({"assets": {"CH": [{"code": "Pororo", "fileId": to_id(img)}, {"code": "Hand"}, {"code": "Hat", "img": base64.b64encode(b"PNG").decode()}]}}), encoding="utf-8")
     export_images(root / "c.json", root / "aimg")
-    assert [p.name for p in (root / "aimg").iterdir()] == ["Pororo.png"]
+    assert [p.name for p in (root / "aimg").iterdir()] == ["Hat.png", "Pororo.png"]
     (root / "t.json").write_text(json.dumps({"title": "뽀로로 EP12 Worksheet"}, ensure_ascii=False), encoding="utf-8")
     a, b = publish(root / "t.json", img, root), publish(root / "t.json", img, root)
     assert a.name.startswith("뽀로로 EP12 Worksheet_") and a != b and a.exists() and b.exists(), (a, b)

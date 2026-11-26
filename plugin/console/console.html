@@ -210,7 +210,7 @@ input[type=file]::file-selector-button { font: inherit; background: var(--surfac
 .cr:last-child { border-bottom: 0; }
 .cr.need { background: var(--warn-soft); }
 .cr img { width: 100px; height: 56px; object-fit: cover; border-radius: 4px; background: var(--surface-2); display: block; }
-.lh.w3, .cr.w3 { grid-template-columns: 96px 128px 132px 96px 48px 56px 80px 80px 150px 180px 150px 56px minmax(200px, 1fr) minmax(260px, 1.4fr); gap: 10px; } /* 엑셀 시트와 같은 열: Cut … Description */
+.lh.w3, .cr.w3 { grid-template-columns: 96px 128px minmax(110px, 1fr) minmax(96px, 0.6fr) 48px 56px 80px 80px minmax(120px, 1fr) minmax(140px, 1.2fr) minmax(120px, 1fr) 56px minmax(180px, 2fr) minmax(220px, 2.6fr); gap: 10px; } /* 엑셀 시트와 같은 열: Cut … Description. 숫자 열과 고정(sticky) CUT·THUMBNAIL은 고정 폭, 글 열은 최소 폭을 지키며 남는 폭을 나눠 가진다 */
 .cr.w3 .code { white-space: pre-line; font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
 .cr.w3 .n { text-align: right; font-variant-numeric: tabular-nums; }
 .cr.w3.sub { border-top: 0; }
@@ -238,7 +238,6 @@ input[type=file]::file-selector-button { font: inherit; background: var(--surfac
   padding: 10px max(16px, env(safe-area-inset-left, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)); }
 .bar .wrap { display: flex; gap: 12px 20px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .bar p { min-width: 0; flex: 1 1 320px; }
-.pane > div > .filters:first-child { margin-top: 0; } /* 왼쪽 카드와 오른쪽 목록의 윗선을 맞춘다 */
 .pane { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 860px) { .pane { grid-template-columns: minmax(0, 1fr); } }
 .agrp h3 { margin: 14px 0 6px; font-size: 13px; color: var(--muted); }
@@ -248,6 +247,10 @@ input[type=file]::file-selector-button { font: inherit; background: var(--surfac
 .arow .acode { margin-left: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
 .arow .ax { border: 0; background: none; color: var(--muted); cursor: pointer; margin-left: 4px; min-width: 24px; min-height: 24px; border-radius: 4px; }
 .arow .ax:focus-visible { outline: 2px solid var(--accent); }
+.arow.ast .ahead, .aadd .ahead { display: flex; gap: 10px; align-items: center; }
+.arow.ast .athumb, .aadd .athumb { width: 96px; height: 72px; flex: none; object-fit: contain; background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; }
+.arow.ast .athumb.none, .aadd .athumb.none { display: grid; place-items: center; font-size: 11px; color: var(--muted); }
+.arow.ast .btn, .aadd .ahead .btn { min-height: 28px; padding: 2px 10px; font-size: 12px; }
 .arow.ast input[type="text"], .aadd input[type="text"], .aadd select { width: 100%; min-height: 32px; font-size: 13px; padding: 4px 8px; }
 .aadd { display: grid; gap: 6px; } .arow .cnt { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
 .chip.rec { background: var(--est); border-color: var(--est-line); }
@@ -334,12 +337,13 @@ const LINK_MSG = LOCAL ? "Google Drive 폴더 주소(https://drive.google.com/dr
 const LINK_PH = "https://drive.google.com/drive/folders/…";
 let T = {}, P = {}, PO = [], PT = {}, PSRC = {}; // PSRC: 칸마다 SB 원본 위치 [순번 키, 칸 번호].  PT: 스토리보드 칸마다 OCR로 읽은 DIALOGUE·NOTE(storyboard_text.py)
 const sbText = (id, i) => (PT[id] && PT[id][i]) || { dia: "", note: "" };
-const S = { tab: 0, title: "", builtTitle: "", W: null, wfilter: "all", uploaded: false, g1: false, g2: false, built: false, files: { docx: null, pdf: null }, folders: {}, filter1: "all", filter3: "all", sort3: { k: null, d: 1 }, sort1: { k: null, d: 1 }, filter2: "all", D: null, src: {}, confirmed1: false, aattr: {}, extra: [] }; // aattr: 에셋별 리깅·디자인 필요·비고, extra: 폴더에 없어 손으로 더한 에셋
+const S = { tab: 0, title: "", builtTitle: "", W: null, wfilter: "all", uploaded: false, g1: false, g2: false, built: false, files: { docx: null, pdf: null }, folders: {}, filter1: "all", filter3: "all", sort3: { k: null, d: 1 }, sort1: { k: null, d: 1 }, filter2: "all", D: null, src: {}, confirmed1: false, aattr: {}, extra: [] }; // aattr: 에셋별 리깅·바꾼 이미지(img, PNG base64), extra: 폴더에 없어 손으로 더한 에셋
 const $ = (s) => document.querySelector(s);
 function h(tag, attrs, ...kids) {
   const e = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
     if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k.startsWith("aria-") && typeof v === "boolean") e.setAttribute(k, String(v)); // aria-pressed 등은 "true"/"false" 글자여야 CSS·보조기기가 읽는다
     else if (v === true) e.setAttribute(k, ""); else if (v !== false && v != null) e.setAttribute(k, v);
   }
   for (const k of kids.flat()) if (k != null && k !== false) e.append(k.nodeType ? k : document.createTextNode(k));
@@ -378,7 +382,6 @@ function totals() {
   }
   return { rows, frames, secs: Math.round(secs * 10) / 10, est, cam, dup, cuts: D.cuts.length };
 }
-const need2 = () => S.D.cuts.filter((c) => c.chFlag); // 이름 없이 나온 인물('친구들' 등)이 있어 추천에서 빠졌을 수 있는 CUT
 const codes = () => new Set(Object.values(S.D.assets).flat().map((a) => a.code));
 const usage = (code) => S.D.cuts.filter((c) => [...c.bg, ...c.ch, ...c.pr].some((x) => x === code || (code === "BabyPororo_Christmas" && x.startsWith(code)))).length;
 const unknownCodes = () => { const k = codes(), u = new Set(); S.D.cuts.forEach((c) => [...c.bg, ...c.ch, ...c.pr].forEach((x) => { if (!k.has(x) && !x.startsWith("BabyPororo_Christmas_")) u.add(x); })); return [...u]; };
@@ -407,6 +410,7 @@ function renderSteps() {
 function go(i) {
   S.tab = i;
   for (let k = 0; k < 5; k++) $("#p" + k).hidden = k !== i;
+  if (i === 3 && !WIDE) { WIDE = true; paintWide(); } // 4단계 워크시트 표는 열이 14개라 넓게 보기로 연다. PD가 '기본 화면'을 누르면 그대로 따른다
   renderSteps(); [renderUpload, renderG1, renderG2, renderResult, renderDash][i]();
 }
 
@@ -467,7 +471,7 @@ function folderAssets() {
 const CATS = [["BG", "배경(BG)"], ["CH", "캐릭터(CH)"], ["PR", "소품(PR)"], ["Matte", "Matte(하늘 배경)"], ["2D", "2D(이미지 배경)"]];
 let AL = { BG: [], CH: [], PR: [], Matte: [], "2D": [] }; // 폴더에서 만든 에셋 목록 {BG:[{name, code, path}], ...}. 시트 Asset 탭의 원천이다
 const aList = () => { const { assets: a, where } = folderAssets(); return Object.fromEntries(CATS.map(([k]) => [k, [...Object.entries(a[k]).map(([name, code]) => ({ name, code, path: where[k + "/" + code].path, fileId: where[k + "/" + code].id })), ...S.extra.filter((x) => x.cat === k).map(({ name, code }) => ({ name, code, manual: true }))]])); };
-const aKey = (k, code) => k + "/" + code, RIG_T = { "○": "리깅 완료", "△": "리깅 중", "□": "리깅 요청 필요" };
+const aKey = (k, code) => k + "/" + code, RIG_T = { "○": "리깅 완료", "△": "리깅 중", "□": "리깅 요청" };
 /* 워크시트 BG 열에는 BG·Matte·2D 코드가 함께 들어간다(EP12: EddyOut, SkyNight) */
 const pool = (cat) => cat === "BG" ? [...AL.BG, ...AL.Matte, ...AL["2D"]] : AL[cat];
 /* 추천: 시나리오에서 뽑은 CUT의 코드 가운데 폴더에 같은 코드나 같은 이름이 있는 것만. 최종값은 PD가 확정한다 */
@@ -497,28 +501,26 @@ async function scanFolder(kind, input, btn) {
   }
 }
 function folderCard() {
-  const fa = folderAssets(), cnt = (k) => Object.keys(fa.assets[k]).length, f = S.folders.series, m = S.folders.seriesMsg;
+  const f = S.folders.series, m = S.folders.seriesMsg;
   const busy = !!(m && m.busy), ok = !!f && !busy, state = busy ? "busy" : ok ? "ok" : m && m.msg ? "bad" : "wait";
   const inp = h("input", { type: "text", id: "fd_series", placeholder: LINK_PH, autocomplete: "off", required: true, "aria-required": "true", "aria-label": "시리즈 에셋 폴더 연결", style: "flex:1;min-width:0;min-height:40px;font-size:14px;padding:8px 12px", value: S.folders.seriesUrl || "", oninput: (e) => { S.folders.seriesUrl = e.target.value; }, onkeydown: (e) => { if (e.key === "Enter") scanFolder("series", inp, btn); } });
   const btn = h("button", { class: "btn primary", style: "min-height:40px", disabled: busy, onclick: () => scanFolder("series", inp, btn) }, "폴더 연결");
   const badge = h("span", { class: "st " + state, role: "status" }, busy ? "확인 중" : ok ? "읽을 수 있음" : state === "bad" ? "실패" : "확인 전");
-  const s = (v, l) => h("div", {}, h("b", {}, v), h("span", {}, l));
   return h("div", { class: "card stack" }, h("h2", {}, "에셋"),
     h("b", {}, "시리즈 에셋 폴더 연결", h("span", { class: "req", "aria-hidden": "true" }, " *")),
-    h("p", { class: "muted", style: "font-size:12px;margin:0" }, "폴더 안에 BG / CH / PR 하위 폴더가 있어야 합니다. 배경은 BG, 캐릭터는 CH, 소품은 PR 폴더에 넣고, 파일 이름이 에셋 이름이 됩니다. 하늘 배경은 Matte, 이미지 배경은 2D 폴더에 넣으면 BG 열에서 함께 고를 수 있습니다(BG 폴더 아래에 두어도 됩니다)."),
+    h("p", { class: "muted", style: "font-size:12px;margin:0" }, "폴더 안에 BG / CH / PR / Matte / 2D 하위 폴더가 있어야 합니다. 배경은 BG, 캐릭터는 CH, 소품은 PR, 하늘 배경은 Matte, 이미지 배경은 2D 폴더에 넣고, 파일 이름이 에셋 이름이 됩니다. Matte와 2D는 BG 열에서 함께 고릅니다."),
     h("div", { class: "row", style: "flex-wrap:nowrap" }, inp, btn, badge),
-    state === "bad" ? h("div", { class: "note", role: "status" }, m.msg) : null,
-    fa.n ? h("div", { class: "stats", style: "padding:0" }, s(fmt(fa.n), "읽은 파일"), s(fmt(cnt("BG")), "BG"), s(fmt(cnt("CH")), "CH"), s(fmt(cnt("PR")), "PR"), s(fmt(cnt("Matte") + cnt("2D")), "Matte·2D"), s(fmt(fa.unresolved.length), "영문 코드 필요"), s(fmt(fa.skipped.length), "건너뛴 파일")) : null);
+    state === "bad" ? h("div", { class: "note", role: "status" }, m.msg) : null);
 }
 /* 에셋 단계 오른쪽 카드: 폴더·추천·확정 상태. 칩을 고칠 때마다 paintBar2가 다시 그린다 */
 function checks2() {
-  const fa = folderAssets(), n = need2().length, names = fa.unresolved.map((x) => x.split("/").pop().replace(A_IMG, "")), all = Object.values(S.sa || {}), rec = all.filter((v) => v.rec.bg.length || v.rec.ch.length || v.rec.pr.length).length;
+  const fa = folderAssets(), names = fa.unresolved.map((x) => x.split("/").pop().replace(A_IMG, ""));
+  const cutBg = {}; if (S.sa) shots2().forEach((x) => { if (x.g.c) cutBg[x.g.id] = cutBg[x.g.id] || S.sa[x.key].bg.length > 0; }); // 컷마다 SHOT 하나라도 BG가 있는지
+  const nCut = Object.keys(cutBg).length, noBg = Object.values(cutBg).filter((v) => !v).length;
   return h("ul", { class: "checks", id: "chk2" },
-    [["시리즈 에셋 폴더", fa.n ? "pass" : "wait", fa.n ? `파일 ${fa.n}개를 읽었습니다. 이 폴더에 있는 에셋만 목록과 선택지에 나옵니다` : "필수입니다. 폴더를 읽어야 에셋 목록이 나오고 BG·CH·PR을 고를 수 있습니다"],
-     ["영문 코드", !fa.n ? "wait" : names.length ? "warn" : "pass", !fa.n ? "폴더를 읽으면 한글 이름을 영문 코드로 바꿉니다" : names.length ? `코드를 정해야 하는 이름 ${names.length}개(${names.join(", ")})` : "모든 이름에 코드가 있습니다"],
-     ["추천", !S.sa ? "wait" : "pass", !S.sa ? "폴더를 읽으면 시나리오에서 뽑은 코드 가운데 폴더에 있는 것을 SHOT마다 추천합니다" : `SHOT ${all.length}개 가운데 ${rec}개에 추천이 있습니다(노란 칩)`],
-     ["이름 없이 나온 인물", n ? "warn" : "pass", n ? `${n}컷에 '친구들' 같은 인물이 있어 CH 추천에서 빠졌을 수 있습니다` : "확인할 컷이 없습니다"],
-     ["PD 확정", S.confirmed2 ? "pass" : "wait", S.confirmed2 ? "확정함" : "추천은 PD가 확인하고 확정해야 워크시트에 들어갑니다"]]
+    [["시리즈 에셋 폴더", fa.n ? "pass" : "wait", fa.n ? `파일 ${fa.n}개를 읽었습니다.` : "필수입니다. 폴더를 읽어야 에셋 목록이 나오고 BG·CH·PR을 고를 수 있습니다"],
+     ["에셋 코드", !fa.n ? "wait" : names.length ? "warn" : "pass", !fa.n ? "폴더를 읽으면 한글 이름을 영문 코드로 바꿉니다" : names.length ? `영문 코드를 정해야 하는 이름 ${names.length}개(${names.join(", ")})` : "모든 이름에 국문, 영문 코드가 있습니다."],
+     ["BG", !S.sa ? "wait" : noBg ? "warn" : "pass", !S.sa ? "폴더를 읽으면 컷마다 BG가 선택되었는지 봅니다" : noBg ? `전체 ${fmt(nCut)}컷 중에 ${fmt(noBg)}컷의 BG가 선택되지 않았습니다.` : "모든 컷에 BG가 선택되었습니다."]]
       .map(([t, c, d]) => h("li", {}, h("span", { class: "tag " + c }, c === "pass" ? "통과" : c === "warn" ? "확인" : "대기"), h("span", {}, h("b", {}, t), " ", d))));
 }
 
@@ -820,6 +822,19 @@ function rowPanel(g, i) {
     h("input", { type: "number", class: "sbtime", min: 0, step: "0.1", inputmode: "decimal", "aria-label": name + " TIME(초)", placeholder: "예: 3", value: sb.time || "", oninput: (e) => { sb.time = e.target.value; paintStats1(); } }));
 }
 /* 바꾼 그림을 스토리보드 칸 크기(240x135, 16:9)에 맞춰 JPEG base64로 만든다. 비율이 다르면 여백 없이 가운데를 채운다 */
+async function assetPng(file) { // 에셋 이미지: 비율을 지켜 긴 변 480px 안으로 줄인다. 캐릭터의 투명 배경을 살리려고 PNG로 둔다
+  const bm = await createImageBitmap(file), k = Math.min(1, 480 / Math.max(bm.width, bm.height)), cv = document.createElement("canvas");
+  cv.width = Math.round(bm.width * k); cv.height = Math.round(bm.height * k); cv.getContext("2d").drawImage(bm, 0, 0, cv.width, cv.height);
+  return cv.toDataURL("image/png").split(",")[1];
+}
+async function replaceAsset(a, file) { // 로컬: 시리즈 에셋 폴더의 원본 파일을 새 그림으로 덮어쓴다. 원본의 형식(png·jpg·webp)과 이름은 그대로 둔다
+  const ext = (a.path.match(/\.(png|jpe?g|webp)$/i) || [, "png"])[1].toLowerCase(), mt = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : "image/" + ext;
+  let data;
+  if (file.type === mt) data = await b64(file);
+  else { const bm = await createImageBitmap(file), cv = document.createElement("canvas"); cv.width = bm.width; cv.height = bm.height; const g = cv.getContext("2d"); if (mt === "image/jpeg") { g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height); } g.drawImage(bm, 0, 0); data = cv.toDataURL(mt, 0.92).split(",")[1]; }
+  const mcp = await window.claude.use("mcp");
+  await mcp.callTool("Google Drive", "replace_file", { fileId: a.fileId, base64Content: data });
+}
 async function panelJpeg(file) {
   const bm = await createImageBitmap(file), W = 240, H = 135, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
   const k = Math.max(W / bm.width, H / bm.height), w = bm.width * k, hh = bm.height * k;
@@ -846,37 +861,45 @@ function renderG2() {
   const p = $("#p2"); p.replaceChildren();
   if (S.folders.series && !S.sa) initShots2();
   p.append(h("div", { class: "grid2", style: "margin-bottom:12px" }, folderCard(), h("div", { class: "card stack" }, h("h2", {}, "올리면 확인하는 것"), checks2(),
-      h("label", { class: "row", style: "gap:8px" }, h("input", { type: "checkbox", id: "c2", checked: !!S.confirmed2, onchange: (e) => { S.confirmed2 = e.target.checked; paintBar2(); } }), "SHOT별 BG·CH·PR을 확인하고 확정합니다"),
+      h("label", { class: "row", style: "gap:8px" }, h("input", { type: "checkbox", id: "c2", checked: !!S.confirmed2, onchange: (e) => { S.confirmed2 = e.target.checked; paintBar2(); } }), "담당자가 에셋 입력값을 확인했습니다."),
       h("p", { class: "muted", id: "msg2", style: "font-size:12px;margin:0", role: "status" }),
       h("div", { class: "row" }, h("button", { class: "btn primary", id: "toG3", onclick: () => { commit2(); S.g2 = true; S.built = false; go(3); } }, "에셋 확정하고 워크시트로")))),
-    h("p", { class: "muted" }, "BG·CH·PR은 시리즈 에셋 폴더에 있는 것만 고를 수 있습니다. 노란 칩은 시나리오에서 뽑은 추천이며, PD가 확정해야 워크시트에 들어갑니다."),
-    h("div", { class: "pane", style: "margin-top:12px" }, h("div", { class: "card", id: "assetBox" }), h("div", {}, h("div", { class: "filters", id: "fl2" }), h("div", { class: "scroll" }, h("div", { class: "list", style: "min-width:640px" },
+    h("div", { class: "pane" }, h("div", { class: "card", id: "assetBox" }), h("div", {}, h("div", { class: "filters", id: "fl2", style: "margin:0 0 12px" }), h("div", { class: "scroll" }, h("div", { class: "list", style: "min-width:640px" },
       h("div", { class: "g2 lh" }, h("span", {}, "CUT"), h("span", {}, "THUMBNAIL"), h("span", {}, "BG"), h("span", {}, "CH"), h("span", {}, "PR")), h("div", { id: "rows2" }))))));
   paintAssets(); paintFilters2(); paintRows2(); paintBar2();
 }
 /* 확정: SHOT별 값을 CUT 단위로 합쳐 시트 조립 데이터에 넣고, 에셋 목록은 폴더 목록으로 바꾼다 */
 function commit2() {
-  S.D.assets = Object.fromEntries(CATS.map(([k]) => [k, AL[k].map((a) => ({ ...a, ...(S.aattr[aKey(k, a.code)] || { rig: "", design: false, note: "" }) }))])); // 시트 Asset 탭의 원천
+  S.D.assets = Object.fromEntries(CATS.map(([k]) => [k, AL[k].map((a) => ({ ...a, ...(S.aattr[aKey(k, a.code)] || { rig: "", img: "" }) }))])); // 시트 Asset 탭의 원천
   const by = {}; shots2().forEach((x) => { if (!x.g.c) return; const v = S.sa[x.key], u = (by[x.g.id] = by[x.g.id] || { bg: new Set(), ch: new Set(), pr: new Set() }); ["bg", "ch", "pr"].forEach((k) => v[k].forEach((code) => u[k].add(code))); });
   S.D.cuts.forEach((c) => { const u = by[c.id] || { bg: [], ch: [], pr: [] }; c.bg = [...u.bg]; c.ch = [...u.ch]; c.pr = [...u.pr]; c.count = chCount(c.ch); });
 }
 function paintAssets() {
   const box = $("#assetBox"); box.replaceChildren(h("h2", {}, "에셋 목록"));
   if (!S.sa) { box.append(h("p", { class: "muted" }, "시리즈 에셋 폴더를 읽으면 폴더에 있는 에셋이 여기에 나옵니다.")); return; }
-  box.append(h("p", { class: "muted", style: "font-size:12px;margin:0" }, "여기 적은 리깅, 디자인 필요, 비고는 시트의 Asset 탭에 들어갑니다."));
+  box.append(h("p", { class: "muted", style: "font-size:12px;margin:0" }, LOCAL ? "에셋 내용을 변경하면 원본 파일에 덮어씁니다." : "고른 리깅과 바꾼 이미지는 시트의 Asset 탭에 들어갑니다. 이 화면에서는 폴더의 원본 파일을 바꾸지 않습니다."));
+  const af = S.afilter || "all";
+  box.append(h("div", { class: "filters", style: "margin:4px 0" }, ...[["all", "전체"], ...CATS.map(([k]) => [k, k])].map(([k, t]) => h("button", { "aria-pressed": af === k, onclick: () => { S.afilter = k; paintAssets(); } }, t + " " + (k === "all" ? CATS.reduce((n, [q]) => n + AL[q].length, 0) : AL[k].length)))));
   const redraw = () => { AL = aList(); paintAssets(); paintRows2(); };
   CATS.forEach(([k, t]) => { // 폴더에 있는 에셋과 손으로 더한 에셋. 비어 있는 분류는 건너뛴다
-    if (!AL[k].length) return;
+    if (!AL[k].length || (af !== "all" && af !== k)) return;
     const g = h("div", { class: "agrp" }, h("h3", {}, t));
     AL[k].forEach((a) => {
-      const at = (S.aattr[aKey(k, a.code)] = S.aattr[aKey(k, a.code)] || { rig: "", design: false, note: "" });
+      const at = (S.aattr[aKey(k, a.code)] = S.aattr[aKey(k, a.code)] || { rig: "", img: "" });
+      const src = at.img ? "data:image/png;base64," + at.img : LOCAL && a.fileId ? "/img?id=" + encodeURIComponent(a.fileId) + (at.v ? "&v=" + at.v : "") : "";
+      const amsg = h("span", { class: "muted", role: "status", style: "font-size:12px" });
+      const pick = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", hidden: true, "aria-label": a.name + " 이미지 파일", onchange: async (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        if (!(LOCAL && a.fileId && !a.manual)) { at.img = await assetPng(f); return paintAssets(); } // 원본이 없거나 claude.ai: 시트에만 넣는다
+        try { amsg.textContent = "원본 파일을 바꾸는 중입니다."; await replaceAsset(a, f); at.img = ""; at.v = Date.now(); paintAssets(); }
+        catch (err) { amsg.textContent = "원본 파일을 바꾸지 못했습니다: " + (err.message || err.code || err); }
+      } });
       g.append(h("div", { class: "arow ast" },
+        h("div", { class: "ahead" }, src ? h("img", { class: "athumb", src, alt: a.name + " 이미지", loading: "lazy" }) : h("div", { class: "athumb none" }, "이미지 없음"),
         h("div", { class: "nm" }, a.name, h("span", { class: "acode" }, a.code),
-          a.manual ? h("button", { class: "ax", "aria-label": a.name + " 빼기", onclick: () => { S.extra = S.extra.filter((x) => !(x.cat === k && x.code === a.code)); delete S.aattr[aKey(k, a.code)]; Object.values(S.sa).forEach((v) => ["bg", "ch", "pr"].forEach((q) => (v[q] = v[q].filter((x) => x !== a.code)))); redraw(); } }, "×") : null),
-        h("div", { class: "row", style: "gap:8px" },
-          h("select", { "aria-label": a.name + " 리깅", onchange: (e) => { at.rig = e.target.value; } }, h("option", { value: "" }, "리깅 미정"), ...S.lists.rig.map((o) => h("option", { value: o, selected: at.rig === o }, o + " " + (RIG_T[o] || "")))),
-          h("label", { class: "row", style: "gap:4px;font-size:13px" }, h("input", { type: "checkbox", checked: at.design, onchange: (e) => { at.design = e.target.checked; } }), "디자인 필요")),
-        h("input", { type: "text", value: at.note, placeholder: "비고", "aria-label": a.name + " 비고", onchange: (e) => { at.note = e.target.value.trim(); } })));
+          a.manual ? h("button", { class: "ax", "aria-label": a.name + " 빼기", onclick: () => { S.extra = S.extra.filter((x) => !(x.cat === k && x.code === a.code)); delete S.aattr[aKey(k, a.code)]; Object.values(S.sa).forEach((v) => ["bg", "ch", "pr"].forEach((q) => (v[q] = v[q].filter((x) => x !== a.code)))); redraw(); } }, "×") : null)),
+        h("div", { class: "row", style: "gap:8px" }, pick, h("button", { class: "btn", onclick: () => pick.click() }, "이미지 바꾸기"), amsg,
+          h("select", { "aria-label": a.name + " 리깅", onchange: (e) => { at.rig = e.target.value; } }, h("option", { value: "" }, "리깅 미정"), ...S.lists.rig.map((o) => h("option", { value: o, selected: at.rig === o }, o + " " + (RIG_T[o] || "")))))));
     });
     box.append(g);
   });
@@ -884,26 +907,33 @@ function paintAssets() {
   const cat = h("select", { "aria-label": "추가할 에셋 분류" }, ...CATS.map(([k, t]) => h("option", { value: k }, t)));
   const nm = h("input", { type: "text", placeholder: "이름(국문)", "aria-label": "추가할 에셋 이름" }), cd = h("input", { type: "text", placeholder: "코드(영문)", "aria-label": "추가할 에셋 코드" });
   const msg = h("p", { class: "muted", role: "status", style: "font-size:12px;margin:0" });
+  let img = ""; // 추가할 에셋의 이미지(PNG base64). 없어도 더할 수 있다
+  const prev = h("div", { class: "athumb none" }, "이미지 없음");
+  const pick = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp", hidden: true, "aria-label": "추가할 에셋 이미지 파일", onchange: async (e) => { const f = e.target.files[0]; if (!f) return; img = await assetPng(f); prev.replaceWith(h("img", { class: "athumb", src: "data:image/png;base64," + img, alt: "추가할 에셋 이미지" })); } });
+  const rig = h("select", { "aria-label": "추가할 에셋 리깅" }, h("option", { value: "" }, "리깅 미정"), ...S.lists.rig.map((o) => h("option", { value: o }, o + " " + (RIG_T[o] || ""))));
   const add = () => {
     const k = cat.value, name = nm.value.trim(), code = cd.value.trim();
     if (!name || !A_ASCII.test(code)) { msg.textContent = "이름과 영문 코드를 적어 주세요. 코드에는 영문, 숫자, _, -만 씁니다."; return; }
     if (CATS.some(([q]) => AL[q].some((a) => a.code === code))) { msg.textContent = `${code}는 이미 목록에 있습니다.`; return; }
-    S.extra.push({ cat: k, name, code }); redraw();
+    S.extra.push({ cat: k, name, code }); S.aattr[aKey(k, code)] = { rig: rig.value, img }; redraw();
   };
   box.append(h("div", { class: "agrp aadd" }, h("h3", {}, "폴더에 없는 에셋 추가"),
     h("p", { class: "muted", style: "font-size:12px;margin:0 0 6px" }, "폴더에 파일이 없는 에셋(컷마다 그리는 2D 이미지 배경 등)을 적습니다. 더한 에셋은 SHOT의 선택지에도 나옵니다."),
-    cat, nm, cd, h("button", { class: "btn", onclick: add }, "추가"), msg));
+    cat, nm, cd,
+    h("div", { class: "ahead" }, prev, pick, h("button", { class: "btn", onclick: () => pick.click() }, "이미지 추가")),
+    rig, h("button", { class: "btn", onclick: add }, "추가"), msg));
 }
 function paintFilters2() {
   const fl = $("#fl2"); fl.replaceChildren(); if (!S.sa) return;
   const all = Object.values(S.sa);
-  [["all", `전체 ${all.length}SHOT`], ...["bg", "ch", "pr"].map((k) => ["no" + k, `${k.toUpperCase()} 없음 ${all.filter((v) => !v[k].length).length}`])]
+  [["cut", `CUT ${shots2().filter((x) => x.i === 0).length}`], ["all", `SHOT ${all.length}`], ...["bg", "ch", "pr"].map((k) => ["no" + k, `${k.toUpperCase()} 없음 ${all.filter((v) => !v[k].length).length}`])]
     .forEach(([k, t]) => fl.append(h("button", { "aria-pressed": S.filter2 === k, onclick: () => { S.filter2 = k; paintFilters2(); paintRows2(); } }, t)));
+  fl.append(h("span", { class: "muted", style: "font-size:12px;align-self:center" }, "에셋 목록만 선택 가능합니다. 노란 칩은 시나리오 기반 AI 추천입니다."));
 }
 function paintRows2() {
   const box = $("#rows2"); box.replaceChildren();
   if (!S.sa) { box.append(h("p", { class: "muted", style: "padding:24px 14px" }, "시리즈 에셋 폴더를 읽으면 모든 컷과 SHOT이 나오고, SHOT마다 BG·CH·PR을 고를 수 있습니다.")); return; }
-  const f = S.filter2, rows = shots2().filter((x) => { const v = S.sa[x.key]; return f === "all" || (f.startsWith("no") && !(v[f.slice(2)] || []).length); });
+  const f = S.filter2, rows = shots2().filter((x) => { const v = S.sa[x.key]; return f === "all" || (f === "cut" && x.i === 0) || (f.startsWith("no") && !(v[f.slice(2)] || []).length); });
   if (!rows.length) box.append(h("p", { class: "muted", style: "padding:24px 14px" }, "해당하는 SHOT이 없습니다."));
   rows.forEach((x) => box.append(row2(x)));
 }
@@ -947,7 +977,7 @@ function renderReview3() {
     listsCard(),
     h("div", { class: "card stats", id: "stats3" }),
     h("div", {}, h("div", { class: "filters", id: "fl3", role: "group", "aria-label": "보기" }),
-      h("div", { class: "scroll" }, h("div", { class: "list", style: "min-width:1880px" }, headRow3(), h("div", { id: "rows3" })))),
+      h("div", { class: "scroll" }, h("div", { class: "list", style: "min-width:1700px" }, headRow3(), h("div", { id: "rows3" })))),
     h("datalist", { id: "cutIds" }, ...S.D.cuts.map((x) => h("option", { value: x.id })))));
   paintFilters3(); paintRows3(); paintStats3();
 }
@@ -959,13 +989,13 @@ const sortHead3 = (k, label) => {
 const headRow3 = () => h("div", { class: "lh w3", id: "lh3" }, sortHead3("id", "CUT"), ...["THUMBNAIL", "Cam Move", "Same Camera", "Sec", "Frame", "Start Frame", "End Frame", "BG", "CH", "PR", "CH_Count", "Dialogue", "Description"].map((t) => h("span", {}, t)));
 function paintFilters3() {
   const D = S.D, fl = $("#fl3"); fl.replaceChildren();
-  [["need", `확인 필요 ${need3().length}`], ["all", `전체 ${D.cuts.reduce((a, c) => a + c.split, 0)}`], ["split", "분할"], ["dup", "동일 연출"], ["cam", "Cam Move"]]
+  [["all", `전체 ${D.cuts.reduce((a, c) => a + c.split, 0)}`], ["dup", `동일 연출 확인 필요 ${D.cuts.filter((c) => c.dup && !c.reviewed).length}건`], ["split", `분할 ${D.cuts.filter((c) => c.split > 1).length}건`]]
     .forEach(([k, t]) => fl.append(h("button", { "aria-pressed": S.filter3 === k, onclick: () => { S.filter3 = k; paintFilters3(); paintRows3(); } }, t)));
   fl.append(h("button", { class: "btn", style: "border-radius:999px;margin-left:auto", onclick: () => { D.cuts.filter((c) => c.dup).forEach((c) => (c.reviewed = true)); refresh3(); } }, "동일 연출 " + D.cuts.filter((c) => c.dup && !c.reviewed).length + "건 한 번에 확인"));
 }
 function paintRows3() {
   const f = S.filter3, { k, d } = S.sort3;
-  let rows = S.D.cuts.filter((c) => f === "all" || (f === "need" && (c.splitAuto || c.dup) && !c.reviewed) || (f === "split" && c.split > 1) || (f === "dup" && c.dup) || (f === "cam" && c.cam.length));
+  let rows = S.D.cuts.filter((c) => f === "all" || (f === "need" && (c.splitAuto || c.dup) && !c.reviewed) || (f === "split" && c.split > 1) || (f === "dup" && c.dup && !c.reviewed) || (f === "cam" && c.cam.length));
   if (k) rows = [...rows].sort((a, b) => cmpId(a, b) * d);
   const box = $("#rows3"); box.replaceChildren();
   if (!rows.length) box.append(h("p", { class: "muted", style: "padding:24px 14px" }, f === "need" ? "확인할 컷이 없습니다. 전체 보기에서 분할 칸 수와 TIME을 한 번 더 훑어 보세요." : "해당하는 컷이 없습니다."));
@@ -974,34 +1004,34 @@ function paintRows3() {
 const CAM_OPTS = ["PAN", "Q-PAN", "Z.I", "Q.Z.I", "Z.O", "S.Z.O", "T.U", "T.D", "CAM Follow", "CAM Shake", "CAM Move"]; // extract_meta.CAM과 같은 목록
 /* 작업현황 열의 드롭다운 목록. 기본값은 build_worksheet.py와 같고(EP12 시트), PD가 시트를 만들기 전에 항목을 더하거나 뺀다.
    바꾼 목록은 이 브라우저에 기억하고, 시트를 만들 때 overrides.json의 "lists"로 넘긴다 */
-const LIST_DEF = [["status", "LO·AN 상태", "LO, AN TK01~04, Render TK01~02",["수정", "완료", "진행중", "x", "101f 완료"]], ["rstatus", "Render·Comp 상태", "Render TK03~04, Comp TK01~05", ["수정", "완료", "진행중", "완료/FX대기", "X"]],
-  ["ver", "AN 완료 버전", "AN 완료", ["V01", "V02", "V03", "V04", "V05"]], ["an", "LO·AN 작업자", "LO·AN 작업자", ["송민주", "김은엽", "임선형", "윤지민", "탁진영"]],
-  ["render", "Render 작업자", "Render 작업자", ["김지희", "심미림"]], ["comp", "Comp 작업자", "Comp 작업자", ["정승환", "김유진"]],
-  ["rig", "리깅", "Asset 탭 리깅 열. ○ 리깅 완료, △ 리깅 중, □ 리깅 요청 필요", ["○", "△", "□"]],
-  ["cam", "Cam Move", "워크시트 표의 Cam Move '+ 선택'에 씁니다. 엑셀 C열은 한 칸에 여러 값을 적으므로 드롭다운을 걸지 않습니다.", CAM_OPTS]];
-S.lists = (() => { let v = {}; try { v = JSON.parse(LS.get("wsLists") || "{}") || {}; } catch (e) {} return Object.fromEntries(LIST_DEF.map(([k, , , d]) => [k, Array.isArray(v[k]) ? v[k] : [...d]])); })();
+// [키, 이름, 기본값, 묶음]. 묶음이 바뀌는 자리에 간격을 둔다(2026-11-26 PD 순서). Cam Move는 엑셀 C열에 드롭다운을 걸지 않고 3단계 '+ 선택'에만 쓴다
+const ST_DEF = ["수정", "완료", "진행중", "x", "101f 완료"], RST_DEF = ["수정", "완료", "진행중", "완료/FX대기", "X"], AN_W = ["송민주", "김은엽", "임선형", "윤지민", "탁진영"];
+const LIST_DEF = [["cam", "Cam Move", CAM_OPTS, 0],
+  ["lostatus", "LO 상태", ST_DEF, 1], ["status", "AN TK 상태", ST_DEF, 1], ["ver", "AN 완료 상태", ["V01", "V02", "V03", "V04", "V05"], 1], ["rstatus", "Render 상태", RST_DEF, 1], ["cstatus", "Comp 상태", RST_DEF, 1],
+  ["lo", "LO 작업자", AN_W, 1], ["an", "AN TK 작업자", AN_W, 1], ["render", "Render 작업자", ["김지희", "심미림"], 1], ["comp", "Comp 작업자", ["정승환", "김유진"], 1],
+  ["rig", "리깅 상태", ["○", "△", "□"], 2]];
+S.lists = (() => { let v = {}; try { v = JSON.parse(LS.get("wsLists") || "{}") || {}; } catch (e) {} return Object.fromEntries(LIST_DEF.map(([k, , d]) => [k, Array.isArray(v[k]) ? v[k] : [...d]])); })();
 const listsOk = () => LIST_DEF.every(([k]) => S.lists[k].length > 0);
 function listsCard() {
   const save = () => { LS.set("wsLists", JSON.stringify(S.lists)); $("#lists3").replaceWith(listsCard()); paintStats3(); };
-  const row = ([k, name, cols, def]) => {
+  const row = ([k, name, def, grp], i) => {
     const items = S.lists[k], inp = h("input", { type: "text", placeholder: "항목 추가", style: "width:120px", "aria-label": name + " 항목 추가",
       onkeydown: (e) => { if (e.key === "Enter") add(); } });
     const add = () => { const v = inp.value.trim(); if (v && !v.includes(",") && !items.includes(v)) { items.push(v); save(); } /* 쉼표는 엑셀 드롭다운의 항목 구분자라 받지 않는다 */ else inp.value = ""; };
-    return h("div", { class: "lrow" }, h("div", {}, h("b", {}, name), h("div", { class: "muted", style: "font-size:12px" }, cols)),
-      h("div", { class: "row", style: "gap:6px;flex-wrap:wrap" }, ...items.map((x, j) => h("span", { class: "chip" }, x, h("button", { "aria-label": name + " " + x + " 빼기", onclick: () => { items.splice(j, 1); save(); } }, "×"))),
+    return h("div", { class: "lrow", style: i && LIST_DEF[i - 1][3] !== grp ? "margin-top:14px" : "" }, h("div", {}, h("b", {}, name)),
+      h("div", { class: "row", style: "gap:6px;flex-wrap:wrap" }, ...items.map((x, j) => h("span", { class: "chip" }, k === "rig" && RIG_T[x] ? x + " " + RIG_T[x] : x, h("button", { "aria-label": name + " " + x + " 빼기", onclick: () => { items.splice(j, 1); save(); } }, "×"))),
         items.length ? null : h("span", { class: "note", role: "status" }, "빈 목록입니다"),
         inp, h("button", { class: "btn", onclick: add }, "추가"),
         String(items) === String(def) ? null : h("button", { class: "btn", style: "margin-left:auto", onclick: () => { S.lists[k] = [...def]; save(); } }, "기본값으로")));
   };
   return h("details", { class: "card", id: "lists3", open: S.listsOpen, ontoggle: (e) => { S.listsOpen = e.target.open; } },
-    h("summary", {}, h("b", {}, "워크시트 드롭다운 목록"), h("span", { class: "muted", style: "font-size:12px" }, `${LIST_DEF.length}개 목록, 항목 ${LIST_DEF.reduce((a, [k]) => a + S.lists[k].length, 0)}개 · 시트를 만들기 전에 상태, 작업자, Cam Move 항목을 더하거나 뺍니다`)),
+    h("summary", {}, h("b", {}, "워크시트 드롭다운 목록"), h("span", { class: "muted", style: "font-size:12px" }, "시트를 만들기 전에 목록을 확정합니다.")),
     h("div", { class: "stack", style: "gap:10px;margin-top:10px" }, ...LIST_DEF.map(row)));
 }
 const START = 101; // 시트의 Start Frame 고정값(build_worksheet.py와 같음)
 function row3(c) { // CUT 하나를 분할 칸 수만큼의 시트 행으로 그린다. 첫 행에만 Cam Move·Same Camera가 들어간다
   const box = h("div", { "data-id": c.id }), need = (c.splitAuto || c.dup) && !c.reviewed;
   const redraw = () => { box.replaceWith(row3(c)); paintStats3(); renderSteps(); };
-  const set = (d) => { c.split = Math.min(10, Math.max(1, c.split + d)); redraw(); };
   const lines = (a) => h("div", { class: "code" }, a.join("\n"));
   for (let i = 0; i < c.split; i++) {
     const first = i === 0, id = c.id + (c.split > 1 ? "abcdefghij"[i] : ""), sa = (S.sa && S.sa[c.id + "#" + i]) || c, frame = rowFrames(c)[i], img = P[c.id] && (P[c.id][i] || P[c.id][0]);
@@ -1015,7 +1045,6 @@ function row3(c) { // CUT 하나를 분할 칸 수만큼의 시트 행으로 그
     const sb = sbText(c.id, i), txt = h("div", { class: "txt", title: "누르면 전체를 봅니다", onclick: () => txt.classList.toggle("open") }, sb.note);
     box.append(h("div", { class: "cr w3" + (need ? " need" : "") + (first ? "" : " sub") },
       h("div", {}, h("div", { class: "id" }, id),
-        first ? h("div", { class: "split", style: "margin-top:4px" }, h("button", { "aria-label": c.id + " 행 줄이기", onclick: () => set(-1) }, "−"), h("output", { title: "시트 행 수" }, String(c.split)), h("button", { "aria-label": c.id + " 행 늘리기", onclick: () => set(1) }, "+")) : null,
         first && (c.splitAuto || c.dup) ? h("label", { class: "row", style: "gap:4px;font-size:12px;margin-top:4px" }, h("input", { type: "checkbox", checked: !!c.reviewed, onchange: (e) => { c.reviewed = e.target.checked; refresh3(); } }), c.splitAuto ? "분할 확인" : "동일 연출 확인") : null),
       h("div", {}, img ? h("img", { class: "pn", style: "width:120px;height:68px", src: "data:image/jpeg;base64," + img, alt: id, loading: "lazy" }) : null),
       first ? h("div", { class: "cell2" }, ...c.cam.map((x, j) => h("span", { class: "chip" }, x, h("button", { "aria-label": c.id + " " + x + " 빼기", onclick: () => { c.cam.splice(j, 1); redraw(); } }, "×"))),
@@ -1037,8 +1066,9 @@ function refresh3() { paintFilters3(); paintRows3(); paintStats3(); renderSteps(
 function paintStats3() {
   const t = totals(), n = need3().length, box = $("#stats3"); if (!box) return; box.replaceChildren();
   const s = (v, l) => h("div", {}, h("b", {}, v), h("span", {}, l));
-  box.append(s(fmt(t.cuts), "시나리오 컷"), s(fmt(PO.reduce((a, id) => a + P[id].length, 0)), "스토리보드 SHOT"), s(fmt(t.rows), "시트 행(분할 포함)"), s(fmt(t.frames), "총 Frame"), s(fmt(t.secs) + "초", `총 러닝타임(초), ${FPS}FPS`), s((t.secs / 60).toFixed(1) + "분", "총 러닝타임(분)"), s(fmt(t.est), "추정 Frame 행"));
-  const lc = lenCheck(t); box.append(h("p", { class: "muted", style: "grid-column:1/-1;margin:6px 0 0;font-size:13px" }, lc.rtText + " · " + lc.tgText));
+  box.append(s(fmt(t.cuts), "컷"), s(fmt(PO.reduce((a, id) => a + P[id].length, 0)), "SHOT"), s(fmt(t.frames), "총 Frame"), s(fmt(t.secs) + "초", `총 러닝타임(초), ${FPS}FPS`), s((t.secs / 60).toFixed(1) + "분", "총 러닝타임(분)"));
+  const lc = lenCheck(t), d = Math.round(Math.abs(lc.diff) * 10) / 10; // 1단계에서 받은 방영 길이(분)와 총 러닝타임을 0.1분 단위로 견준다
+  box.append(h("p", { class: "muted", style: "grid-column:1/-1;margin:6px 0 0;font-size:13px" }, !lc.hasRt ? "1단계에서 방영 길이를 입력하면 목표 방영 시간과 비교합니다." : d === 0 ? `목표 방영 시간 ${lc.rt}분과 같습니다.` : `목표 방영 시간 ${lc.rt}분 대비 ${d}분 ${lc.diff > 0 ? "초과합니다." : "부족합니다."}`));
   const bb = $("#build3"); if (bb) bb.disabled = n !== 0 || !listsOk();
   setBar(n !== 0 ? `분할 제안과 동일 연출 ${n}건을 확인하면 시트를 만들 수 있습니다.` : !listsOk() ? "드롭다운 목록에 빈 목록이 있습니다. 항목을 하나 이상 넣어 주세요." : `확인할 제안이 모두 끝났습니다. 추정 Frame ${fmt(t.est)}행은 노란색으로 시트에 남고, 요약에도 '추정 포함'으로 적힙니다. 확정하면 Google Sheet를 새로 만듭니다. 기존 시트를 덮어쓰지 않습니다.`);
 }
