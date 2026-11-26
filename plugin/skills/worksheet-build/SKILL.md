@@ -59,6 +59,8 @@ python -I verify_worksheet.py <out.xlsx> <out.summary.json>
 
 Claude Code·Codex에서는 콘솔을 `worksheet-console` 스킬로 띄워 쓴다(스토리보드가 커넥터 한도 10MB를 넘기 때문). 이때 작업 폴더는 Google Drive 데스크톱 앱의 PC 경로이고, 1·2·4절의 커넥터 호출 대신 파일을 직접 다룬다. 3절(조립과 검증)은 같다.
 
+로컬 콘솔은 4단계 "확정하고 시트 만들기"를 누르면 서버(`serve_console.py`의 `build_sheet`)가 아래 3~5를 바로 돌려 `01_산출`에 xlsx를 넣고, 결과 화면에 시트 파일과 검증 결과를 보여 준다. PD가 콘솔 밖에서 "시트 만들어 줘"라고 할 때만 아래 절차를 직접 따른다.
+
 1. 작업 폴더의 PC 경로와 애니메이션명·에피소드 번호를 정한다. PD가 Drive 주소를 주면 `serve_console.py`의 `drive_path(<폴더 id>)`로 PC 경로를 찾는다. 에피소드 폴더는 `<작업 폴더>\<애니메이션명>\EP12\`다.
 2. `02_작업\cuts.json`, `00_입력`의 시나리오와 스토리보드를 그 자리에서 읽는다. 내려받기와 7MB 한도는 없다.
 3. 렌더 이미지는 이렇게 모은다. 콘솔이 에셋 파일의 PC 경로를 `fileId`에 넣어 두었고, PD가 바꾼 이미지는 `img`에 있다. 스크립트가 `img`를 먼저 쓴다.

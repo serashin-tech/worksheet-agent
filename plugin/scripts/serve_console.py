@@ -81,6 +81,42 @@ def drive_path(fid):
     return None
 
 
+def drive_file_id(p):
+    """PC 경로 → Drive 파일 id(drive_path의 반대). 데스크톱 앱이 아직 올리지 않은 파일은 None.
+    같은 이름의 항목마다 상위 폴더 이름을 따라 올라가 경로가 같은지 본다."""
+    mount, p = drive_mount(), pathlib.Path(p).resolve()
+    if not mount or not DRIVEFS.is_dir() or mount.resolve() not in p.parents:
+        return None
+    for db in DRIVEFS.glob("*/metadata_sqlite_db"):
+        try:
+            con = sqlite3.connect(f"file:{db.as_posix()}?mode=ro", uri=True)
+            con.text_factory = lambda b: b.decode("utf-8", "replace")
+            for fid, sid in con.execute("select id, stable_id from items where local_title = ? and trashed = 0 and is_folder = 0", (p.name,)).fetchall():
+                parts, cur = [], sid
+                while cur and len(parts) < 64:
+                    t = con.execute("select local_title from items where stable_id = ?", (cur,)).fetchone()
+                    if not t:
+                        break
+                    parts.append(t[0])
+                    q = con.execute("select parent_stable_id from stable_parents where item_stable_id = ?", (cur,)).fetchone()
+                    cur = q and q[0]
+                parts.reverse()
+                if re.fullmatch(r"[\w-]{20,}", fid or "") and any(c == p for c in (mount.joinpath(*parts), mount.joinpath("공유 드라이브", *parts), mount.joinpath("Shared drives", *parts))):
+                    con.close(); return fid
+            con.close()
+        except sqlite3.Error:
+            continue
+    return None
+
+
+def sheet_link(inp, roots):
+    """콘솔 결과 화면·작업 현황의 'Google Sheets에서 열기': 01_산출의 xlsx를 Drive에서 Google Sheets로 바로 편집하는 링크.
+    편집한 내용은 같은 xlsx에 저장되고, 데스크톱 앱이 PC로 내려받으면 작업 현황이 읽는다. 아직 올라가지 않았으면 url이 비어 있다."""
+    p = from_id(inp.get("fileId"), roots)
+    fid = drive_file_id(p)
+    return {"url": f"https://docs.google.com/spreadsheets/d/{fid}/edit?rtpof=true&sd=true" if fid else "", "inDrive": bool(drive_mount() and drive_mount().resolve() in p.parents)}
+
+
 def from_id(i, roots):
     if i and not i.startswith("L") and re.fullmatch(r"[\w-]{10,}", i):  # Drive 폴더 id: 데스크톱 앱 폴더로 바꾸고, 연결한 폴더로 허용한다
         p = drive_path(i)
@@ -159,6 +195,33 @@ def replace_file(inp, roots):
     return meta(p)
 
 
+def build_sheet(inp, roots):
+    """콘솔 4단계 '확정하고 시트 만들기'(로컬): 02_작업/cuts.json으로 worksheet-build 로컬 모드(3절 조립·검증)를 돌려 01_산출에 xlsx를 넣는다.
+    시나리오는 같은 에피소드 00_입력의 가장 최근 docx다. 검증 FAIL이 있어도 파일은 넣고, 결과를 그대로 돌려줘 콘솔이 보여 준다."""
+    import subprocess, tempfile
+    cuts = from_id(inp.get("fileId"), roots)
+    if cuts.name != "cuts.json" or cuts.parent.name != "02_작업":
+        raise Fail("invalid_argument", f"02_작업의 cuts.json이 아닙니다: {cuts}")
+    ep = cuts.parent.parent
+    docx = sorted((ep / "00_입력").glob("*.docx"), key=lambda p: p.stat().st_mtime)
+    if not docx:
+        raise Fail("not_found", f"시나리오(docx)가 없습니다: {ep / '00_입력'}", 404)
+    out_dir = ep / "01_산출"; out_dir.mkdir(exist_ok=True)
+    tmp = pathlib.Path(tempfile.mkdtemp(prefix="wsbuild_")); (tmp / "thumbs").mkdir()
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    run = lambda *a: subprocess.run([sys.executable, "-I", *map(str, a)], cwd=HERE, env=env, capture_output=True, text=True, encoding="utf-8")
+    r = run(HERE / "console_overrides.py", cuts, tmp / "o.json")
+    if r.returncode:
+        raise Fail("build_error", "cuts.json을 읽지 못했습니다: " + (r.stderr.strip().splitlines() or [""])[-1], 500)
+    export_images(cuts, tmp / "aimg")
+    b = run(HERE / "build_worksheet.py", docx[-1], tmp / "thumbs", "-", tmp / "out.xlsx", "--overrides", tmp / "o.json", "--asset-images", tmp / "aimg", *r.stdout.split())
+    if b.returncode:
+        raise Fail("build_error", "시트를 조립하지 못했습니다: " + (b.stderr.strip().splitlines() or [""])[-1], 500)
+    v = run(HERE / "verify_worksheet.py", tmp / "out.xlsx")
+    checks = [{"ok": ln.startswith("PASS"), "text": ln[5:]} for ln in v.stdout.splitlines() if ln.startswith(("PASS ", "FAIL "))]
+    return {**meta(publish(cuts, tmp / "out.xlsx", out_dir)), "checks": checks}
+
+
 def get_values(inp, roots):
     sid = inp.get("spreadsheetId", "")
     if not sid.startswith("L"):  # 시연용 Google Sheet id: 로컬에는 없다
@@ -209,7 +272,7 @@ def gen_storyboard(path):
 GEN = {"scenario": gen_scenario, "storyboard": gen_storyboard}
 
 
-TOOLS = {("Google Drive", "search_files"): search_files, ("Google Drive", "create_file"): create_file, ("Google Drive", "replace_file"): replace_file, ("Google Sheets", "get_values"): get_values}
+TOOLS = {("Google Drive", "search_files"): search_files, ("Google Drive", "create_file"): create_file, ("Google Drive", "replace_file"): replace_file, ("Worksheet", "build_sheet"): build_sheet, ("Worksheet", "sheet_link"): sheet_link, ("Google Sheets", "get_values"): get_values}
 
 
 def handler(roots, data, connectors):
