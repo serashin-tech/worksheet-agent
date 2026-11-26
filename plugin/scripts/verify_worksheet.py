@@ -69,6 +69,9 @@ def verify(path, summary=None):
         s = json.loads(pathlib.Path(summary).read_text(encoding="utf-8"))
         add("노란색 Frame 행 수 = 요약값", yellow == s["estimated_frame_rows"], f"{yellow}")
         add("시트 행 수 = 요약값", len(ids) == s["rows"])
+        if s.get("frames_total") is not None:  # 콘솔이 넘긴 Frame을 시트가 다시 추정하면 여기서 어긋난다
+            ft = sum(frame(r) for r in range(2, last + 1))
+            add("시트 Frame 합계 = 요약값(콘솔 Frame)", ft == s["frames_total"], f"시트 {ft} / 요약 {s['frames_total']}")
         if s.get("fps") is not None:
             add("시트 FPS = 요약값(PD가 정한 FPS)", fps == float(s["fps"]), f"시트 {fps} / 요약 {s['fps']}")
         if s.get("target_cuts") is not None:

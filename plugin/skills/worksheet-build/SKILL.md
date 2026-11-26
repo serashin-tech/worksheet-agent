@@ -53,7 +53,7 @@ python -I verify_worksheet.py <out.xlsx> <out.summary.json>
    - `contentMimeType`: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
    - `base64Content`: `sha256:<해시>:<out.xlsx 절대 경로, 폴더 구분은 />`
    - `disableConversionToGoogleType`는 넣지 않는다. Google Sheet로 변환되어야 콘솔 작업현황이 읽는다.
-4. 돌려받은 `viewUrl`을 PD에게 준다. 콘솔 작업현황의 "작업 폴더에서 찾기"를 누르면 이 시트가 목록에 나온다.
+4. 돌려받은 `viewUrl`을 PD에게 준다. PD는 콘솔 작업현황의 "볼 워크시트"에 이 링크를 붙여 넣고 "링크로 읽기"를 누른다.
 
 ## 로컬 모드(Claude Code·Codex, Google Drive 데스크톱 앱)
 
