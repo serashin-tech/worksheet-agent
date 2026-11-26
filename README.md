@@ -125,7 +125,7 @@ PD가 쓰는 화면은 **Worksheet 콘솔**입니다. 원본은 `plugin/console/
    워크시트 콘솔 띄워 줘
    ```
 
-   `worksheet-console` 스킬이 커넥터 연결을 확인한 뒤 서버를 띄웁니다. 스킬 이름으로 직접 부르려면 Claude Code에서는 `/worksheet-agent:worksheet-console`, Codex에서는 `$worksheet-console`을 입력합니다.
+   `worksheet-console` 스킬이 커넥터 연결을 확인한 뒤 서버를 띄웁니다. 스킬 이름으로 직접 부르려면 Claude Code에서는 `/worksheet-agent:worksheet-console`, Codex에서는 `$`를 입력해 나오는 스킬 목록에서 `worksheet-agent:worksheet-console`을 고릅니다.
 3. 브라우저가 `http://127.0.0.1:8765/`로 열립니다. 열리지 않으면 이 주소를 직접 입력합니다. 서버는 이 PC에서만 열립니다.
 4. 콘솔의 **Google 연결 설정**에서 다음을 확인합니다.
    - 1단계: Google Drive·Google Sheets 커넥터와 Google Drive 데스크톱 앱이 "연결됨"인지 봅니다. 커넥터가 "연결 안 됨"이면 2-2를 마친 뒤 "워크시트 콘솔 다시 띄워 줘"라고 말합니다. Codex에서는 커넥터가 "확인 안 함"으로 나오며 그대로 써도 됩니다.
