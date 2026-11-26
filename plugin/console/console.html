@@ -1082,7 +1082,7 @@ function paintStats3() {
 const BUILD_STEPS = ["컷 목록 조립", "THUMBNAIL 삽입", "드롭다운과 요약 탭 만들기", "Google Sheet로 변환해 Drive에 저장", "검증 실행"];
 /* 로컬: 01_산출 xlsx의 'Google Sheets에서 열기' 링크. 데스크톱 앱이 Drive에 올려야 생기므로 5초마다 2분 동안 다시 묻는다 */
 async function pollSheetLink(n = 24) {
-  const id = curSheetId(); if (!LOCAL || !id || S.sheetUrl && S.sheetUrl.id === id) return;
+  const id = curSheetId(); if (!LOCAL || !id || S.sheetUrl && S.sheetUrl.id === id && S.sheetUrl.url) return; // 링크를 찾았으면 멈춘다. '올리는 중'(wait)이면 다시 묻는다
   let url = ""; try { url = (await (await window.claude.use("mcp")).callTool("Worksheet", "sheet_link", { fileId: id }, { cache: false })).payload.url; } catch (e) {}
   if (curSheetId() !== id) return;
   S.sheetUrl = { id, url, wait: !url && n > 0 };
