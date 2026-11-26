@@ -38,6 +38,7 @@ python -I build_worksheet.py <시나리오.docx> <thumbs폴더> - <out.xlsx> --o
 python -I verify_worksheet.py <out.xlsx> <out.summary.json>
 ```
 
+- `cuts.json`의 컷에 `sbp`(콘솔 2단계에서 PD가 확인한 스토리보드 칸)가 있으면 `thumbnails.py`는 돌리지 않고, `<thumbs폴더>` 자리에 빈 폴더를 넣는다. THUMBNAIL은 `sbp`의 칸 그림(PD가 바꾼 그림 포함)을, Dialogue·Description은 `sbp`의 DIALOGUE·NOTE를 쓴다. `sbp`가 없는 컷은 전처럼 시나리오 값을 쓴다. TIME은 시트에 열이 없어 `cuts.json`에만 남는다.
 - `-` 자리는 에셋 목록 xlsx다. 옛 `cuts.json`(2-4)이면 그 경로를 넣고 `--asset-images`를 뺀다.
 - FAIL이 있으면 올리기 전에 PD에게 항목을 그대로 보여 준다. 러닝타임 FAIL은 추정 Frame 때문일 수 있어 PD가 올릴지 정한다. 다른 FAIL은 고친 뒤 다시 조립한다.
 - 스토리보드 칸의 컷 번호는 콘솔에서 PD가 짝지은 값이 `cuts.json`에 담겨 온다. `thumbnails.ep12_label`은 EP12 시험용 규칙이라 다른 에피소드에는 쓰지 않는다.
@@ -73,4 +74,4 @@ Claude Code·Codex에서는 콘솔을 `worksheet-console` 스킬로 띄워 쓴�
 
 ## 아직 넘기지 않는 값
 
-콘솔에서 고친 Same Camera, Cam Move는 cuts.json에 들어 있지만 build_worksheet.py가 시나리오에서 다시 도출한다. BG·CH·PR과 Asset 탭은 3단계 값을 그대로 쓴다. 이 값이 달라졌으면 올린 뒤 시트에서 고치게 PD에게 알린다.
+스토리보드 칸의 DIALOGUE·NOTE·PICTURE는 `sbp`로 넘어간다(3절). 콘솔에서 고친 Same Camera, Cam Move는 cuts.json에 들어 있지만 build_worksheet.py가 시나리오에서 다시 도출한다. BG·CH·PR과 Asset 탭은 3단계 값을 그대로 쓴다. 이 값이 달라졌으면 올린 뒤 시트에서 고치게 PD에게 알린다.

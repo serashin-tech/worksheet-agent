@@ -13,7 +13,7 @@ overrides.json: {"splits": {"11": 2}, "frames": {"C001": 120}, "estimated": ["C0
   rowassets: 시트 행별 {"C001a": {"bg": [...], "ch": [...], "pr": [...], "count": 1}}. 있으면 시나리오 도출값 대신 쓴다.
   lists: 워크시트 드롭다운 목록(status·rstatus·ver·an·render·comp·rig). rig는 Asset 탭 리깅 열. 콘솔의 '워크시트 드롭다운 목록'에서 PD가 고친 값이고, 없는 키는 LISTS 기본값을 쓴다. cam(Cam Move)은 콘솔 선택지용이라 시트에 드롭다운을 걸지 않는다(한 칸에 여러 값).
 """
-import re, sys, os, json, argparse, pathlib
+import re, sys, os, json, argparse, pathlib, base64
 import numpy as np
 import openpyxl
 from openpyxl.drawing.image import Image as XlImage
@@ -324,13 +324,21 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
         frame = estimate(r["feat"]) if est else int(frame)
         est_rows += est
         start = int(overrides.get("starts", {}).get(r["id"], START))
+        rt = overrides.get("rowtext", {}).get(r["id"])  # 콘솔 2단계에서 PD가 확인한 스토리보드 DIALOGUE·NOTE가 있으면 그 값
+        dia, desc = (rt["dialogue"], rt["description"]) if rt else (r["dialogue"], r["description"])
         ws.append([r["id"], None, "\n".join(r["cam"]), r["same"], f"=ROUND(F{i}/{fps:g},1)", f"=H{i}-G{i}+1", start, start + frame - 1,
-                   "\n".join(r["bg"]), "\n".join(r["ch"]), "\n".join(r["pr"]), r["count"], r["dialogue"], r["description"]])
+                   "\n".join(r["bg"]), "\n".join(r["ch"]), "\n".join(r["pr"]), r["count"], dia, desc])
         if est:
             ws.cell(i, 8).fill = YELLOW
         ws.row_dimensions[i].height = 64.5
         for col in range(1, len(heads) + 1):
             ws.cell(i, col).alignment = Alignment(wrap_text=True, vertical="center")
+        img = overrides.get("rowimgs", {}).get(r["id"])  # 콘솔 2단계의 칸 그림(PD가 바꾼 그림 포함)이 thumbs 폴더보다 먼저
+        if img:
+            im = XlImage(shrink(base64.b64decode(img), 240))
+            im.width, im.height = 114, 64
+            ws.add_image(im, f"B{i}")
+            continue
         name = None
         if r["first"]:
             name = "C%02d" % r["cut"] if r["cut"] < 100 else "C%d" % r["cut"]
