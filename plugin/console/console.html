@@ -330,7 +330,7 @@ if (LOCAL) window.claude = { use: async (n) => n !== "mcp" ? null : {
   } } };
 const lid = (p) => "L" + btoa(String.fromCharCode(...new TextEncoder().encode(p.replace(/\\/g, "/").replace(/\/+$/, "")))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const folderMatch = (v) => v.match(/folders\/([\w-]{10,})/) || v.trim().match(/^([\w-]{20,})$/) || (LOCAL && /^([A-Za-z]:[\\/]|\/)/.test(v.trim()) ? [v, lid(v.trim())] : null);
-const LINK_MSG = "Google Drive 폴더 주소(https://drive.google.com/drive/folders/…)를 붙여 넣어 주세요.";
+const LINK_MSG = LOCAL ? "Google Drive 폴더 주소(https://drive.google.com/drive/folders/…)나 Google Drive 데스크톱 앱 드라이브의 폴더 경로(G:\\내 드라이브\\…)를 붙여 넣어 주세요." : "Google Drive 폴더 주소(https://drive.google.com/drive/folders/…)를 붙여 넣어 주세요.";
 const LINK_PH = "https://drive.google.com/drive/folders/…";
 let T = {}, P = {}, PO = [], PT = {}, PSRC = {}; // PSRC: 칸마다 SB 원본 위치 [순번 키, 칸 번호].  PT: 스토리보드 칸마다 OCR로 읽은 DIALOGUE·NOTE(storyboard_text.py)
 const sbText = (id, i) => (PT[id] && PT[id][i]) || { dia: "", note: "" };

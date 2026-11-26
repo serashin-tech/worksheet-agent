@@ -3,6 +3,7 @@
 콘솔은 Google Drive·Google Sheets 커넥터를 부르는데, 로컬에서는 이 서버가 같은 호출(search_files, create_file, get_values)을
 Google Drive 데스크톱 앱의 동기화 폴더(G:\\내 드라이브\\…)에서 대신 처리한다. 커넥터의 10MB 한도 없이 큰 스토리보드도 다룬다.
 - PD는 콘솔에 Drive 폴더 주소(…/folders/<id>)를 붙여 넣는다. 서버는 데스크톱 앱의 메타데이터 DB에서 그 id의 PC 경로를 찾는다.
+  데스크톱 앱 드라이브(G:) 안의 PC 경로를 붙여 넣어도 그 폴더를 연결한 폴더로 받는다.
 - 폴더·파일 id는 절대 경로를 base64url로 감싼 값("L"로 시작)이다.
 - 콘솔에서 연결한 Drive 폴더와 --root로 준 폴더 안에서만 읽고 쓴다. 127.0.0.1에만 열린다.
 - /status는 Claude Code가 확인한 커넥터(--connectors)와 데스크톱 앱 상태를 콘솔의 연결 설정 1단계에 준다.
@@ -94,8 +95,11 @@ def from_id(i, roots):
         p = pathlib.Path(base64.urlsafe_b64decode(i[1:] + "=" * (-len(i[1:]) % 4)).decode()).resolve()
     except (binascii.Error, UnicodeDecodeError, ValueError):
         raise Fail("not_found", "잘못된 id입니다.", 404)
-    if not any(p == r or r in p.parents for r in roots):  # --root 밖은 읽지도 쓰지도 않는다
-        raise Fail("permission_denied", f"허용한 폴더 밖입니다: {p}", 403)
+    mount = drive_mount()
+    if p.is_dir() and mount and mount.resolve() in p.parents and not any(p == r or r in p.parents for r in roots):
+        roots.append(p)  # 데스크톱 앱 드라이브(G:) 안의 PC 경로: Drive 주소처럼 연결한 폴더로 받는다
+    if not any(p == r or r in p.parents for r in roots):  # 연결한 폴더와 --root 밖은 읽지도 쓰지도 않는다
+        raise Fail("permission_denied", f"연결할 수 없는 폴더입니다: {p}. Google Drive 데스크톱 앱 드라이브({mount or 'G:'}) 안의 폴더이거나 Drive 폴더 주소여야 합니다.", 403)
     return p
 
 
