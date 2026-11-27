@@ -146,13 +146,15 @@ def fit(golden_xlsx, docx_path, asset_xlsx):
         if g and not r["split"]:
             X.append(r["feat"]); y.append(g)
     w, *_ = np.linalg.lstsq(np.array(X, float), np.array(y, float), rcond=None)
-    MODEL.write_text(json.dumps({"coef": list(map(float, w)), "n": len(y), "note": "EP12 일반 행 선형 회귀. 초안 값으로만 쓴다."}, indent=1))
+    MODEL.write_text(json.dumps({"coef": list(map(float, w)), "n": len(y), "fps": 29.97, "note": "EP12 일반 행 선형 회귀(정답 시트 29.97fps Frame). 초안 값으로만 쓴다."}, indent=1))
     return w
 
 
-def estimate(feat):
-    w = json.loads(MODEL.read_text())["coef"]
-    return int(min(300, max(24, round(float(np.dot(w, feat))))))
+def estimate(feat, fps=None):
+    """계수는 EP12 정답 시트(29.97fps)의 Frame으로 학습했다(frame_model.json의 fps). 다른 FPS면 같은 초 길이가 되도록 환산한다."""
+    m = json.loads(MODEL.read_text())
+    f = min(300, max(24, round(float(np.dot(m["coef"], feat)))))
+    return int(f if fps is None else max(1, round(f * fps / m["fps"])))
 
 
 def shrink(data, px=480):
@@ -322,7 +324,7 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
     for i, r in enumerate(rows, start=2):
         frame = overrides.get("frames", {}).get(r["id"])
         est = frame is None or r["id"] in overrides.get("estimated", [])  # 콘솔이 넘긴 추정값도 노란색
-        frame = estimate(r["feat"]) if frame is None else int(frame)  # 콘솔 값이 있으면 추정값이어도 그대로 쓴다(PD가 콘솔에서 본 Frame·러닝타임과 같게)
+        frame = estimate(r["feat"], fps) if frame is None else int(frame)  # 콘솔 값이 있으면 추정값이어도 그대로 쓴다(PD가 콘솔에서 본 Frame·러닝타임과 같게)
         est_rows += est
         start = int(overrides.get("starts", {}).get(r["id"], START))
         rt = overrides.get("rowtext", {}).get(r["id"])  # 콘솔 2단계에서 PD가 확인한 스토리보드 DIALOGUE·NOTE가 있으면 그 값
@@ -397,7 +399,7 @@ def build(docx_path, thumbs, asset_xlsx, out, ep, overrides, runtime_min=10, tar
     sm.column_dimensions["A"].width, sm.column_dimensions["B"].width, sm.column_dimensions["C"].width = 40, 28, 16
     wb.save(out)
     summary = {"fps": fps, "ep": ep, "cuts": n_cuts, "rows": len(rows), "last_row": last, "dup_cuts": dup, "estimated_frame_rows": est_rows,
-               "unknown_asset_codes": unknown, "runtime_min": runtime_min, "target_cuts": target_cuts, "tol_min": tol_min, "frames_total": sum(estimate(r["feat"]) if overrides.get("frames", {}).get(r["id"]) is None else int(overrides["frames"][r["id"]]) for r in rows)}
+               "unknown_asset_codes": unknown, "runtime_min": runtime_min, "target_cuts": target_cuts, "tol_min": tol_min, "frames_total": sum(estimate(r["feat"], fps) if overrides.get("frames", {}).get(r["id"]) is None else int(overrides["frames"][r["id"]]) for r in rows)}
     return summary
 
 

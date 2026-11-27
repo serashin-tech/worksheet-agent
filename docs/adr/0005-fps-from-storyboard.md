@@ -7,3 +7,4 @@ ADR 0001은 EP12 정답 시트에 맞춰 29.97fps로 고정했지만, 스토리�
 - EP12 정답 시트(29.97)와 견주는 시험은 FPS를 29.97로 넣어 따로 돌려야 한다.
 - `build_worksheet.py`는 overrides의 `fps`를 그대로 Sec 수식에 쓰고, 없으면 기본값 없이 멈춘다. `console_overrides.py`도 cuts.json에 `fps`가 없으면 멈춘다. `verify_worksheet.py`는 시트 수식에서 FPS를 읽어 러닝타임을 계산하고, 요약의 `fps`와 다르면 실패로 보고한다(2026-11-24).
 - 토스트가 실제로 어느 FPS로 납품하는지는 확인 전이다(CONTEXT.md의 '납품 FPS').
+- Frame 추정 계수(`frame_model.json`)는 EP12 정답 시트의 29.97fps Frame으로 학습했다. FPS만 바꾸고 Frame을 그대로 두면 24FPS에서 러닝타임이 25% 길게 나오므로(EP12 12.96분), PD가 확정하지 않은 Frame은 `FPS / 29.97`을 곱해 같은 초 길이로 환산한다. PD가 고친 Frame은 그대로 둔다(2026-11-27).

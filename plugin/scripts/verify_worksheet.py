@@ -1,10 +1,12 @@
 """조립한 Worksheet xlsx를 만든 코드와 따로 다시 열어 검사한다. 하나라도 FAIL이면 종료 코드 1.
 사용: python -I verify_worksheet.py <xlsx> [<summary.json>]
 """
-import re, sys, json, pathlib
+import math, re, sys, json, pathlib
 import openpyxl
 
 PROC_START = 15  # O열부터 공정 열
+RANGED = re.compile(r"(.+)_[\d,\s-]+")  # 콘솔이 번호 범위로 묶은 코드(BabyPororo_Christmas_01-05, 08). 앞부분이 Asset 탭에 있으면 된다
+sec1 = lambda f, fps: math.floor(f / fps * 10 + 0.5) / 10  # Sheets ROUND·콘솔 Math.round와 같은 반올림(.5는 올림). Python round는 .5를 짝수로 보내 콘솔보다 짧게 나온다
 
 
 def verify(path, summary=None):
@@ -19,7 +21,7 @@ def verify(path, summary=None):
     add = lambda name, ok, detail="": res.append((name, bool(ok), detail))
 
     head = [wb["Asset"].cell(2, c).value for c in range(1, 10)]
-    add("Asset 탭이 EP12 형식(머리글 9열)", head == ["Asset Name(국문)", "Asset Code(영문)", "경로", "제작자", "설명", "렌더 이미지", "비고", "디자인 필요 여부", "리깅"], str(head))
+    add("Asset 탭 머리글이 토스트 형식(9열)", head == ["Asset Name(국문)", "Asset Code(영문)", "경로", "제작자", "설명", "렌더 이미지", "비고", "디자인 필요 여부", "리깅"], str(head))
     wa = wb["Asset"]
     rig = [dv for dv in wa.data_validations.dataValidation if str(dv.sqref).startswith("I3:")]
     add("Asset 리깅 열에 ○·△·□ 드롭다운", rig and all(x in rig[0].formula1 for x in "○△□"), str(rig[0].formula1) if rig else "없음")
@@ -42,9 +44,12 @@ def verify(path, summary=None):
         for c in (9, 10, 11):
             for code in str(ws.cell(r, c).value or "").split("\n"):
                 code = code.strip()
-                if code and code not in codes and not code.startswith("BabyPororo_Christmas_"):
+                rg = RANGED.fullmatch(code)
+                if code and code not in codes and not (rg and rg.group(1) in codes):
                     unknown.add(code)
     add("BG·CH·PR 코드가 모두 Asset에 있음", not unknown, f"없는 코드 {sorted(unknown)}")
+    no_bg = [ids[r - 2] for r in range(2, last + 1) if not str(ws.cell(r, 9).value or "").strip()]
+    add("BG가 모든 행에 있음", not no_bg, f"빈 행 {len(no_bg)}/{len(ids)} {no_bg[:5]} (3단계에서 고르거나 작업자가 채움)" if no_bg else "")
     cnt_bad = [r for r in range(2, last + 1) if ws.cell(r, 12).value is None]
     add("CH_Count 비어 있지 않음", not cnt_bad)
     sm = wb["요약"]
@@ -77,7 +82,7 @@ def verify(path, summary=None):
         if s.get("target_cuts") is not None:
             add("시나리오 컷 수 = 목표 컷 수", s["cuts"] == s["target_cuts"], f"{s['cuts']} / 목표 {s['target_cuts']}")
         if s.get("runtime_min") is not None:
-            sec = sum(round(frame(r) / fps, 1) for r in range(2, last + 1)) if fps else 0
+            sec = sum(sec1(frame(r), fps) for r in range(2, last + 1)) if fps else 0
             mins = round(sec / 60, 2)
             add("총 러닝타임이 방영 길이 허용 오차 안", abs(mins - s["runtime_min"]) <= s["tol_min"], f"{mins}분 / 방영 {s['runtime_min']}분, 허용 {s['tol_min']}분")
     return res

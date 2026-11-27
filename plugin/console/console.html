@@ -231,6 +231,7 @@ input[type=file]::file-selector-button { font: inherit; background: var(--surfac
 .chip button { border: 0; background: none; padding: 0 2px; color: var(--muted); line-height: 1; }
 .split { display: flex; align-items: center; gap: 4px; }
 .split button { width: 26px; height: 26px; border: 1px solid transparent; box-shadow: var(--ring); background: var(--surface); border-radius: 4px; padding: 0; }
+.split button.wide { width: auto; padding: 0 6px; white-space: nowrap; font-size: 12px; }
 .split output { min-width: 28px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; }
 .fr { width: 72px; text-align: right; font-variant-numeric: tabular-nums; }
 .fr.est { background: var(--est); border-color: var(--est-line); }
@@ -376,7 +377,10 @@ const chCount = (ch) => ch.reduce((a, c) => a + (c.startsWith("BabyPororo") ? ba
 /* CUT Frame을 시트 행(스토리보드 SHOT) 수로 나눠 담는다. 나머지는 앞 행부터 1씩 더해 합계가 CUT Frame과 같다.
    행 수가 바뀌면 다시 나누고, PD가 행 Frame을 고치면 그 행만 확정(rfc)되고 CUT Frame은 행의 합이 된다 */
 function rowFrames(c) {
-  if (!c.rf || c.rf.length !== c.split) { const n = c.split, q = Math.floor(c.frame / n), r = c.frame % n; c.rf = Array.from({ length: n }, (_, i) => Math.max(1, q + (i < r ? 1 : 0))); c.rfc = c.rf.map(() => false); c.rs = []; }
+  if (!c.rf || c.rf.length !== c.split) { const n = c.split, q = Math.floor(c.frame / n), r = c.frame % n; c.rf = Array.from({ length: n }, (_, i) => Math.max(1, q + (i < r ? 1 : 0))); c.rfc = c.rf.map(() => false); c.rs = []; c.rfFps = c.frameFps || BASE_FPS; }
+  if (c.rfFps !== FPS) { // 추정 Frame은 BASE_FPS 기준이라, FPS가 다르면 PD가 확정하지 않은 행만 같은 초 길이로 환산한다
+    const k = FPS / c.rfFps; c.rf = c.rf.map((f, i) => c.fc || c.rfc[i] ? f : Math.max(1, Math.round(f * k))); c.rfFps = c.frameFps = FPS; c.frame = c.rf.reduce((a, x) => a + x, 0);
+  }
   return c.rf;
 }
 function totals() {
@@ -596,6 +600,7 @@ const CAM = [["Q.Z.I", "Q\\.?\\s?Z\\.?\\s?I"], ["S.Z.O", "S\\.?\\s?Z\\.?\\s?O"],
 const SAME_REF = /(\d+)\s?번\s?컷과?\s?(?:동일|같은)\s?연출/, SPLIT_MARK = /\(\s*(?:[가-힣]+\s)?(\d)\s?분할/, TRANSITION = /^\(\s*[A-Za-z ]*WIPE[^)]*\)$/i;
 const MAIN = [["뽀로로", "Pororo"], ["크롱", "Crong"], ["루피", "Loopy"], ["에디", "Eddy"], ["패티", "Petty"]];
 const BABY = /아기\s?뽀로로\s?([0-9][0-9~,\s\/부터까지\-]*)?|아기\s?([0-9]+)/g;
+const BASE_FPS = 29.97; // FRAME_COEF를 학습한 EP12 정답 시트의 FPS(frame_model.json의 fps)
 const FRAME_COEF = [50.60277509567471, 2.0799565690429813, 0.17928012475401894, 17.989530931074718, -0.8415186022475404, -8.453209766695219]; // plugin/scripts/frame_model.json과 같은 값
 const estFrame = (f) => Math.min(300, Math.max(24, Math.round(f.reduce((a, x, i) => a + x * FRAME_COEF[i], 0))));
 function camMoves(text) { // 긴 토큰이 먹은 자리는 지운다(Q.Z.I 안의 Z.I 방지)
@@ -660,19 +665,33 @@ async function genData(kind, file) {
 let SB = null; // 서버가 준 원본: { thumbs, panels: { order, panels, text } }
 const cutId = (v) => { const t = String(v || "").trim().toUpperCase(), m = /^C?(\d+)([A-Z]*)$/.exec(t); return m ? "C" + (m[2] ? +m[1] : String(+m[1]).padStart(3, "0")) + m[2] : t; };
 /* 스토리보드의 컷 번호는 읽지 않는다. 스토리보드 컷을 S.sbOrd 순서대로 놓고 시나리오 컷 번호를 차례로 붙인다.
-   어긋나면 PD가 2단계 표에서 컷을 위아래로 옮긴다. 시나리오 컷보다 많은 스토리보드 컷은 추가 컷(X01…)이 된다 */
+   어긋나면 PD가 2단계 표에서 컷을 위아래로 옮긴다. 시나리오 컷보다 많은 스토리보드 컷은 추가 컷(X01…)이 된다.
+   스토리보드가 한 컷의 이어지는 그림을 따로 묶으면 그 뒤 컷이 모두 밀리므로, PD가 그 묶음을 앞 컷에 붙인다(S.sbJoin) */
+const sbBlocks = () => { const b = []; S.sbOrd.forEach((k, pos) => { if (pos && S.sbJoin.has(k)) b.at(-1).push(k); else b.push([k]); }); return b; }; // 컷 하나 = 묶음 하나와 거기 붙인 묶음들
 function fillSbMap(reset) {
   const n = SB.panels.order.length;
-  if (reset || !S.sbOrd || S.sbOrd.length !== n) S.sbOrd = Array.from({ length: n }, (_, k) => k);
+  if (reset || !S.sbOrd || S.sbOrd.length !== n) { S.sbOrd = Array.from({ length: n }, (_, k) => k); S.sbJoin = new Set(); }
   const ids = S.D.cuts.map((c) => c.id); S.sbMap = [];
-  S.sbOrd.forEach((k, pos) => { S.sbMap[k] = ids[pos] || "X" + String(pos - ids.length + 1).padStart(2, "0"); });
+  sbBlocks().forEach((bl, i) => { const id = ids[i] || "X" + String(i - ids.length + 1).padStart(2, "0"); bl.forEach((k) => { S.sbMap[k] = id; }); });
 }
-function moveSb(id, d) { // id 컷을 한 칸 위(-1)나 아래(+1)로 옮기고 번호를 다시 붙인다
-  const pos = PO.indexOf(id), to = pos + d; if (pos < 0 || to < 0 || to >= S.sbOrd.length) return;
-  [S.sbOrd[pos], S.sbOrd[to]] = [S.sbOrd[to], S.sbOrd[pos]];
-  fillSbMap(); applySbMap(); paintFilters1(); paintRows1(); paintStats1(); renderSteps();
-  const el = document.querySelector(`#rows1 [data-id="${PO[to]}"]`); if (el) el.scrollIntoView({ block: "center" });
+function remapSb(id) {
+  fillSbMap(); applySbMap(); renderSteps(); if (S.tab === 1) renderG1(); // 대조 판정 칸도 다시 그린다
+  const el = id && document.querySelector(`#rows1 [data-id="${id}"]`); if (el) el.scrollIntoView({ block: "center" });
 }
+function moveSb(id, d) { // id 컷(붙인 묶음 포함)을 한 칸 위(-1)나 아래(+1)로 옮기고 번호를 다시 붙인다
+  const b = sbBlocks(), i = b.findIndex((x) => S.sbMap[x[0]] === id), j = i + d; if (i < 0 || j < 0 || j >= b.length) return;
+  [b[i], b[j]] = [b[j], b[i]]; S.sbOrd = b.flat(); fillSbMap(); remapSb(S.sbMap[b[j][0]]);
+}
+function joinSb(id) { const b = sbBlocks(), i = b.findIndex((x) => S.sbMap[x[0]] === id); if (i > 0) { S.sbJoin.add(b[i][0]); remapSb(S.sbMap[b[i - 1][0]]); } } // 앞 컷의 이어지는 SHOT으로 붙인다
+function unjoinSb(k) { S.sbJoin.delete(k); fillSbMap(); remapSb(S.sbMap[k]); }
+const noteNo = (id) => { const m = /(?:^|[\s#\/])(\d{1,3})\s?\.(?!\d)/.exec((PT[id] || []).map((x) => x.note || "").join("\n")); return m ? +m[1] : null; }; // 스토리보드 NOTE 앞의 컷 번호("12. (4분할 컷)…")
+function shiftAt() { // NOTE의 컷 번호가 붙인 컷 번호와 연달아 3번 다르면 그 첫 컷을 돌려준다(OCR 오독 한두 개는 넘긴다)
+  /* ponytail: NOTE 첫 숫자를 컷 번호로 본다. 다른 스튜디오 양식이면 번호가 없어 경고하지 않을 뿐 틀리게 막지는 않는다 */
+  let run = [];
+  for (const id of PO) { const n = /^C\d+$/.test(id) ? noteNo(id) : null; if (n == null) continue; if (String(+id.slice(1)).endsWith(String(n))) run = []; // OCR이 앞자리를 흘리는 일이 잦다(18 → "8.") else if (run.push({ id, n }) === 3) return run[0]; }
+  return null;
+}
+const noText = (id) => (PT[id] || []).every((t) => !(t.dia || "").trim() && !(t.note || "").trim()); // 글 없이 그림만 있는 묶음: 앞 컷에서 이어지는 그림일 때가 많다
 function applySbMap() {
   T = {}; P = {}; PO = []; PT = {}; PSRC = {};
   const tx = (SB.panels.text = SB.panels.text || {});
@@ -764,7 +783,7 @@ function pdfCard() {
       has && f.pdf.msg ? h("div", { class: "note", role: "status" }, f.pdf.msg) : null,
       has && !f.pdf.reading ? h("div", { class: "stats", id: "stats1", style: "padding:0" }) : null),
     h("div", { class: "card stack" }, h("h2", {}, "올리면 확인하는 것"), h("ul", { class: "checks" },
-      [["시나리오와 스토리보드 컷 대조", has && !f.pdf.reading ? (S.D.cuts.some((c) => !P[c.id]) ? "warn" : "pass") : "wait", has && !f.pdf.reading ? sbMsg() : "두 자료를 비교해 컷을 대조합니다"]]
+      [["시나리오와 스토리보드 컷 대조", has && !f.pdf.reading ? (S.D.cuts.some((c) => !P[c.id]) || groups1().some((g) => !g.c) || shiftAt() ? "warn" : "pass") : "wait", has && !f.pdf.reading ? sbMsg() : "두 자료를 비교해 컷을 대조합니다"]]
         .map(([t, c, d]) => h("li", {}, h("span", { class: "tag " + c }, c === "pass" ? "통과" : c === "warn" ? "확인" : "대기"), h("span", {}, h("b", {}, t), " ", d)))),
       inputPath("시나리오", f.docx && f.docx.save && f.docx.save.st === "ok" ? f.docx.save.url : null), // 1단계에서 저장한 시나리오를 여기서 열어 볼 수 있다
       inputPath("스토리보드", f.pdf && f.pdf.save && f.pdf.save.st === "ok" ? f.pdf.save.url : null),
@@ -775,7 +794,10 @@ function pdfCard() {
 const SB_META = { ratio: "16:9", res: "1920*1080", fps: "24FPS" }; // 스토리보드 PDF 쪽 머리글에 적힌 값(기본값)
 function sbMsg() {
   const D = S.D, extra = groups1().filter((g) => !g.c).map((g) => g.id), missing = D.cuts.filter((c) => !P[c.id]).length;
-  return (missing ? `시나리오 컷 ${missing}개가 스토리보드에 없습니다.` : "컷이 매칭되었습니다.") + (extra.length ? ` 시나리오에 없는 컷: ${extra.join(", ")}` : "");
+  const sh = shiftAt(), shTxt = sh ? ` ${sh.id}부터 스토리보드 NOTE의 컷 번호(${sh.n})가 다릅니다.` : "";
+  if (!missing && !extra.length && !sh) return "컷 수와 스토리보드 NOTE의 컷 번호가 맞습니다.";
+  return shTxt + (missing ? `시나리오 컷 ${missing}개가 스토리보드에 없습니다.` : "") + (extra.length ? ` 시나리오에 없는 컷: ${extra.join(", ")}.` : "") +
+    " 스토리보드가 한 컷의 이어지는 그림을 따로 묶으면 그 뒤 컷이 모두 한 칸씩 밀립니다. '글 없는 묶음'을 열어 앞 컷에서 이어지는 그림이면 '앞에 붙이기'를 누르세요.";
 }
 const groups1 = () => { const m = new Map(S.D.cuts.map((c) => [c.id, c])); return PO.map((id) => ({ id, c: m.get(id) || null, n: P[id].length })); };
 const panelName = (g, i) => g.id + (g.n > 1 ? "abcdefghij"[i] : "");
@@ -799,19 +821,19 @@ const sortHead = (k, label) => {
 const headRow1 = () => h("div", { class: "lh", id: "lh1" }, sortHead("id", "CUT"), h("span", {}, "PICTURE"), h("span", {}, "DIALOGUE"), h("span", {}, "NOTE"), h("span", {}, "TIME(sec)"));
 function paintFilters1() {
   const gs = groups1(), fl = $("#fl1"); fl.replaceChildren();
-  const opts = [["all", `전체 ${gs.length}`], ["multi", `여러 SHOT으로 된 컷 ${gs.filter((g) => g.n > 1).length}`], ["extra", `시나리오에 없음 ${gs.filter((g) => !g.c).length}`]];
+  const opts = [["all", `전체 ${gs.length}`], ["multi", `여러 SHOT으로 된 컷 ${gs.filter((g) => g.n > 1).length}`], ["extra", `시나리오에 없음 ${gs.filter((g) => !g.c).length}`], ["notext", `글 없는 묶음 ${gs.filter((g) => noText(g.id)).length}`]];
   opts.forEach(([k, t]) => fl.append(h("button", { "aria-pressed": S.filter1 === k, onclick: () => { S.filter1 = k; paintFilters1(); paintRows1(); } }, t)));
 }
 function paintRows1() {
   const f = S.filter1, { k, d } = S.sort1;
-  let gs = groups1().filter((g) => f === "all" || (f === "multi" && g.n > 1) || (f === "extra" && !g.c));
+  let gs = groups1().filter((g) => f === "all" || (f === "multi" && g.n > 1) || (f === "extra" && !g.c) || (f === "notext" && noText(g.id)));
   if (k) gs = [...gs].sort((a, b) => a.id.localeCompare(b.id, "en", { numeric: true }) * d);
   const box = $("#rows1"); box.replaceChildren();
   if (!gs.length) box.append(h("p", { class: "muted", style: "padding:24px 14px" }, "해당하는 컷이 없습니다."));
   gs.forEach((g) => g.n && P[g.id].forEach((_, i) => box.append(rowPanel(g, i))));
 }
 function rowPanel(g, i) {
-  const first = i === 0, c = g.c, name = panelName(g, i);
+  const first = i === 0, c = g.c, name = panelName(g, i), src = (PSRC[g.id] || [])[i], jk = src && src[1] === 0 && !first ? SB.panels.order.indexOf(src[0]) : -1;
   if (!PT[g.id]) PT[g.id] = []; if (!PT[g.id][i]) PT[g.id][i] = { dia: "", note: "" };
   const sb = PT[g.id][i]; // OCR 초안. 고치면 이 객체가 바뀌어 4단계 워크시트 화면에도 그대로 보인다
   const area = (k, lab) => h("textarea", { class: "sbt", rows: 3, "aria-label": name + " " + lab, oninput: (e) => { sb[k] = e.target.value; } }, sb[k] || ""); // textarea는 value 속성이 아니라 내용으로 채운다
@@ -819,10 +841,12 @@ function rowPanel(g, i) {
   const pick = h("input", { type: "file", accept: "image/*", hidden: true, "aria-label": name + " PICTURE 바꾸기", onchange: async (e) => { const x = e.target.files[0]; if (!x) return; const b = await panelJpeg(x); setPanel(g.id, i, b); img.src = "data:image/jpeg;base64," + b; e.target.value = ""; } });
   return h("div", { class: "cr" + (first ? " gs" : ""), "data-id": g.id },
     h("div", {}, h("div", { class: "id" }, name),
-      first && SB ? h("div", { class: "split", style: "margin-top:4px" }, h("button", { "aria-label": g.id + " 위로", title: "위로", disabled: PO.indexOf(g.id) === 0, onclick: () => moveSb(g.id, -1) }, "▲"), h("button", { "aria-label": g.id + " 아래로", title: "아래로", disabled: PO.indexOf(g.id) === PO.length - 1, onclick: () => moveSb(g.id, 1) }, "▼")) : null),
+      first && SB ? h("div", { class: "split", style: "margin-top:4px" }, h("button", { "aria-label": g.id + " 위로", title: "위로", disabled: PO.indexOf(g.id) === 0, onclick: () => moveSb(g.id, -1) }, "▲"), h("button", { "aria-label": g.id + " 아래로", title: "아래로", disabled: PO.indexOf(g.id) === PO.length - 1, onclick: () => moveSb(g.id, 1) }, "▼")) : null,
+      first && SB && PO.indexOf(g.id) > 0 ? h("div", { class: "split", style: "margin-top:4px" }, h("button", { class: "wide", "aria-label": g.id + "을 앞 컷에 붙이기", title: "앞 컷의 이어지는 SHOT으로 붙입니다", onclick: () => joinSb(g.id) }, "앞에 붙이기")) : null,
+      jk >= 0 && S.sbJoin.has(jk) ? h("div", { class: "split", style: "margin-top:4px" }, h("button", { class: "wide", title: "붙인 묶음을 다시 따로 된 컷으로 돌립니다", onclick: () => unjoinSb(jk) }, "떼기")) : null),
     h("div", { class: "pic" }, img, pick, h("button", { class: "btn", onclick: () => pick.click() }, "그림 바꾸기")),
     area("dia", "DIALOGUE"),
-    h("div", {}, area("note", "NOTE"), first && !c ? h("div", { class: "note" }, "시나리오에 없는 컷입니다. PD에게 확인해 주세요.") : null),
+    h("div", {}, area("note", "NOTE"), first && !c ? h("div", { class: "note" }, "시나리오에 없는 컷입니다. PD에게 확인해 주세요.") : null, first && noText(g.id) ? h("div", { class: "note" }, "글 없이 그림만 있는 묶음입니다. 앞 컷에서 이어지는 그림이면 '앞에 붙이기'를 누르세요.") : null),
     h("input", { type: "number", class: "sbtime", min: 0, step: "0.1", inputmode: "decimal", "aria-label": name + " TIME(초)", placeholder: "예: 3", value: sb.time || "", oninput: (e) => { sb.time = e.target.value; paintStats1(); } }));
 }
 /* 바꾼 그림을 스토리보드 칸 크기(240x135, 16:9)에 맞춰 JPEG base64로 만든다. 비율이 다르면 여백 없이 가운데를 채운다 */
@@ -1041,7 +1065,7 @@ function row3(c) { // CUT 하나를 분할 칸 수만큼의 시트 행으로 그
     const first = i === 0, id = c.id + (c.split > 1 ? "abcdefghij"[i] : ""), sa = (S.sa && S.sa[c.id + "#" + i]) || c, frame = rowFrames(c)[i], img = P[c.id] && (P[c.id][i] || P[c.id][0]);
     /* 엑셀과 같이 Start·End Frame을 입력하고 Frame = End - Start + 1, Sec = ROUND(Frame/FPS, 1). Start를 고치면 End는 그대로 두고 Frame이 바뀐다 */
     const st = (c.rs && c.rs[i]) || START, end = st + frame - 1;
-    const setF = (f) => { c.rf[i] = f; c.rfc[i] = true; c.frame = c.rf.reduce((a, x) => a + x, 0); redraw(); };
+    const setF = (f) => { c.rf[i] = f; c.rfc[i] = true; c.frame = c.rf.reduce((a, x) => a + x, 0); c.frameFps = FPS; redraw(); };
     const num = (v, lab, cls, ok) => h("input", { type: "number", class: "fr" + cls, min: 1, step: 1, value: v, "aria-label": id + " " + lab,
       onchange: (e) => { const x = Math.round(+e.target.value); if (!ok(x)) e.target.value = v; } });
     const stIn = num(st, "Start Frame", "", (x) => { if (!(x >= 1 && x <= end)) return false; (c.rs = c.rs || [])[i] = x; setF(end - x + 1); return true; });
