@@ -441,7 +441,11 @@ if __name__ == "__main__":
     if not data or not (data / "cuts.json").exists():
         data = None
         print("시연 데이터 없이 시작합니다. 시나리오와 스토리보드를 올리면 콘솔이 그 파일로 데이터를 만듭니다.")
-    srv = ThreadingHTTPServer(("127.0.0.1", a.port), handler(roots, data, connectors))
+    ThreadingHTTPServer.allow_reuse_address = os.name != "nt"  # Windows의 SO_REUSEADDR는 이미 쓰는 포트에도 서버를 하나 더 열어, 예전 서버가 조용히 요청을 받는다
+    try:
+        srv = ThreadingHTTPServer(("127.0.0.1", a.port), handler(roots, data, connectors))
+    except OSError:
+        sys.exit(f"포트 {a.port}를 이미 다른 프로그램(전에 띄운 콘솔일 수 있음)이 쓰고 있습니다. 그 서버를 멈추거나 --port {a.port + 1}처럼 다른 포트로 띄우세요.")
     url = f"http://127.0.0.1:{a.port}/"
     print("콘솔:", url)
     for r in roots:
